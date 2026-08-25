@@ -1,4 +1,4 @@
-# pegah-sales-evaluation
+# pegah-visitor-scoring
 
 اسکیل ارزیابی فروشنده پگاه، در فرمت استاندارد `SKILL.md`. مستقل است: این پوشه را
 هرجا بگذاری کار می‌کند.
@@ -19,17 +19,22 @@ examples/sample-input.json    نمونه ورودی کامل
 
 | معیار | جدول |
 |---|---|
-| ۱ تعداد مغازه وزنی | `Sales.DarkhastFaktor` (`ccNoeMoshtary` ۳۴۷/۳۴۸/۳۵۰) |
+| ۱ تعداد مغازه وزنی | `Sales.AmarForosh_Arshive` (`ccNoeMoshtary` ۳۴۷/۳۴۸/۳۵۰) |
 | ۲ ویزیت مثبت | `Sales.VisitForoshandeh_Arshiv` |
-| ۳ اقلام هر فاکتور | `Sales.VisitForoshandeh_Arshiv` |
-| ۴ مشتری خرید کرده | `Sales.VisitForoshandeh_Arshiv` |
-| ۵ مرجوعی | `Sales.ElamMarjoee` + `ElamMarjoeeSatr` |
-| ۶ هدف گروه محصول | `Sales.HadafForoshandeh_PG` + `DarkhastFaktorSatr` |
+| ۳ اقلام هر فاکتور | `Sales.DarkhastFaktorSatr` |
+| ۴ مشتری خرید کرده | `AmarForosh_Arshive` ÷ `VisitForoshandeh_Arshiv` |
+| ۵ مرجوعی | `Sales.AmarForosh_Arshive.IsMarjoee` |
+| ۶ هدف گروه محصول | `Sales.HadafForoshandeh_PG` + `AmarForosh_Arshive` |
 
-دو تله که وقت زیادی می‌گیرند اگر از قبل ندانی:
+`Sales.AmarForosh_Arshive` مرکز ثقل است: ۲۳ میلیون سطر، تا امروز به‌روز، و چون
+فروش و مرجوعی هر دو در آن‌اند، صورت و مخرجِ درصد مرجوعی از یک تعریف می‌آیند.
+
+سه تله که وقت زیادی می‌گیرند اگر از قبل ندانی:
 
 - `Sales.AmalkardRozanehForosh` و `Sales.HadafForosh` دقیقاً به اسمِ همین کارند و
   از **۲۰۱۸** به‌روز نمی‌شوند. جست‌وجوی اسکیما اول همین‌ها را می‌آورد.
+- `Sales.ElamMarjoee` **اعلامِ** مرجوعی است نه مرجوعیِ ثبت‌شده. زنده است و جواب
+  می‌دهد، ولی ۱۰ تا ۲۵ برابر کمتر — با آن هیچ‌کس به خط حذفِ ۲٪ نمی‌رسد.
 - بدون فیلتر `Sales.Foroshandeh.ccNoeForoshandeh = 1` (درخواست‌گیر)، سرپرست و
   رییس مرکز با نمره‌های سه‌رقمی صدر جدول را می‌گیرند.
 
@@ -38,7 +43,7 @@ examples/sample-input.json    نمونه ورودی کامل
 در بخش Skills، «افزودن از URL» و آدرس این پوشه در گیت‌هاب:
 
 ```
-https://github.com/<owner>/<repo>/tree/main/pegah-sales-evaluation
+https://github.com/<owner>/<repo>/tree/main/pegah-visitor-scoring
 ```
 
 کل پوشه با هم می‌آید. چون اسکریپت اجرایی دارد، اسکیل **خاموش** ایمپورت می‌شود؛
