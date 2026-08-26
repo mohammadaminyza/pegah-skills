@@ -40,27 +40,43 @@ SELECT MAX(Tarikh) AS akharin FROM Sales.AmarForosh_Arshive;
 (`rooz`، `amar`، `satr`، `vis`، `nafar`).
 
 ```sql
-WITH rooz AS (
-    SELECT ccForoshandeh, Tarikh,
-           COUNT(DISTINCT CASE WHEN ccNoeMoshtary=347 THEN ccMoshtary END) * 1
-         + COUNT(DISTINCT CASE WHEN ccNoeMoshtary=348 THEN ccMoshtary END) * 3
-         + COUNT(DISTINCT CASE WHEN ccNoeMoshtary=350 THEN ccMoshtary END) * 5 AS vazni_rooz
-    FROM Sales.AmarForosh_Arshive
-    WHERE Tarikh >= '2026-07-23' AND Tarikh < '2026-08-23' AND IsMarjoee = 0
-    GROUP BY ccForoshandeh, Tarikh
+WITH params AS (
+    SELECT CAST('2026-08-22' AS date) AS rooz_arzyabi,
+           1                          AS mahaneh
+),
+bazeh AS (
+    SELECT CASE WHEN p.mahaneh = 1
+                THEN DATEADD(day, 1, DATEADD(month, -1, CAST(p.rooz_arzyabi AS datetime)))
+                ELSE CAST(p.rooz_arzyabi AS datetime) END AS d_from,
+           DATEADD(day, 1, CAST(p.rooz_arzyabi AS datetime)) AS d_to,
+           p.rooz_arzyabi, p.mahaneh
+    FROM params p
+),
+taghvim AS (
+    SELECT COUNT(*) AS rooz_kari
+    FROM Global.Taghvim g CROSS JOIN bazeh b
+    WHERE g.Tarikh >= b.d_from AND g.Tarikh < b.d_to AND g.CodeNoeTatili IS NULL
+),
+rooz AS (
+    SELECT a.ccForoshandeh, a.Tarikh,
+           COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary=347 THEN a.ccMoshtary END) * 1
+         + COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary=348 THEN a.ccMoshtary END) * 3
+         + COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary=350 THEN a.ccMoshtary END) * 5 AS zarib_rooz
+    FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
+    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
+    GROUP BY a.ccForoshandeh, a.Tarikh
 ),
 shop AS (
-    SELECT ccForoshandeh, SUM(vazni_rooz) AS weighted_shops, COUNT(*) AS rooz_kari
-    FROM rooz GROUP BY ccForoshandeh
+    SELECT ccForoshandeh, SUM(zarib_rooz) AS tedad_ba_zarib FROM rooz GROUP BY ccForoshandeh
 ),
 amar AS (
-    SELECT ccForoshandeh,
-           COUNT(DISTINCT CASE WHEN IsMarjoee=0 THEN ccDarkhastFaktor END) AS invoice_count,
-           SUM(CASE WHEN IsMarjoee=0 THEN Rial ELSE 0 END)                 AS gross_sales_amount,
-          -SUM(CASE WHEN IsMarjoee=1 THEN Rial ELSE 0 END)                 AS returns_amount
-    FROM Sales.AmarForosh_Arshive
-    WHERE Tarikh >= '2026-07-23' AND Tarikh < '2026-08-23'
-    GROUP BY ccForoshandeh
+    SELECT a.ccForoshandeh,
+           COUNT(DISTINCT CASE WHEN a.IsMarjoee=0 THEN a.ccDarkhastFaktor END) AS invoice_count,
+           SUM(CASE WHEN a.IsMarjoee=0 THEN a.Rial ELSE 0 END)                 AS gross_sales_amount,
+          -SUM(CASE WHEN a.IsMarjoee=1 THEN a.Rial ELSE 0 END)                 AS returns_amount
+    FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
+    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to
+    GROUP BY a.ccForoshandeh
 ),
 satr AS (
     SELECT d.ccForoshandeh,
@@ -68,54 +84,83 @@ satr AS (
                         + CAST(t.ccKala AS varchar(12))) AS invoice_line_count
     FROM Sales.DarkhastFaktorSatr t
     JOIN Sales.DarkhastFaktor d ON d.ccDarkhastFaktor = t.ccDarkhastFaktor
-    WHERE d.TarikhDarkhast >= '2026-07-23' AND d.TarikhDarkhast < '2026-08-23'
+    CROSS JOIN bazeh b
+    WHERE d.TarikhDarkhast >= b.d_from AND d.TarikhDarkhast < b.d_to
     GROUP BY d.ccForoshandeh
 ),
 vis AS (
-    SELECT ccForoshandeh,
-           SUM(MorajehShodeh) AS visits_total,
-           SUM(VisitMosbat)   AS visits_positive
-    FROM Sales.VisitForoshandeh_Arshiv
-    WHERE TarikhVisit >= '2026-07-23' AND TarikhVisit < '2026-08-23' AND IsTatil = 0
-    GROUP BY ccForoshandeh
+    SELECT v.ccForoshandeh, SUM(v.MorajehShodeh) AS visits_total,
+           SUM(v.VisitMosbat) AS visits_positive
+    FROM Sales.VisitForoshandeh_Arshiv v CROSS JOIN bazeh b
+    WHERE v.TarikhVisit >= b.d_from AND v.TarikhVisit < b.d_to AND v.IsTatil = 0
+    GROUP BY v.ccForoshandeh
 ),
 faal AS (
-    SELECT DISTINCT ccForoshandeh, ccMoshtary FROM Sales.MoshtaryfaalForoshandeh_Arshive
-    WHERE Tarikh >= '2026-07-23' AND Tarikh < '2026-08-23'
+    SELECT DISTINCT m.ccForoshandeh, m.ccMoshtary
+    FROM Sales.MoshtaryfaalForoshandeh_Arshive m CROSS JOIN bazeh b
+    WHERE m.Tarikh >= b.d_from AND m.Tarikh < b.d_to
 ),
 tour AS (
-    SELECT DISTINCT ccForoshandeh, ccMoshtary FROM Sales.VisitForoshandeh_Arshiv
-    WHERE TarikhVisit >= '2026-07-23' AND TarikhVisit < '2026-08-23' AND IsTatil = 0
+    SELECT DISTINCT v.ccForoshandeh, v.ccMoshtary
+    FROM Sales.VisitForoshandeh_Arshiv v CROSS JOIN bazeh b
+    WHERE v.TarikhVisit >= b.d_from AND v.TarikhVisit < b.d_to AND v.IsTatil = 0
 ),
 kharid AS (
-    SELECT DISTINCT ccForoshandeh, ccMoshtary FROM Sales.AmarForosh_Arshive
-    WHERE Tarikh >= '2026-07-23' AND Tarikh < '2026-08-23' AND IsMarjoee = 0
+    SELECT DISTINCT a.ccForoshandeh, a.ccMoshtary
+    FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
+    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
 ),
 moshtary AS (
     SELECT fa.ccForoshandeh,
-           COUNT(*)                                                 AS customers_assigned,
-           SUM(CASE WHEN k.ccMoshtary IS NOT NULL THEN 1 ELSE 0 END) AS customers_purchased
+           COUNT(*)                                                 AS faal_dar_tour,
+           SUM(CASE WHEN k.ccMoshtary IS NOT NULL THEN 1 ELSE 0 END) AS kharid_karde
     FROM faal fa
     JOIN tour t        ON t.ccForoshandeh = fa.ccForoshandeh AND t.ccMoshtary = fa.ccMoshtary
     LEFT JOIN kharid k ON k.ccForoshandeh = fa.ccForoshandeh AND k.ccMoshtary = fa.ccMoshtary
     GROUP BY fa.ccForoshandeh
+),
+nafar AS (
+    SELECT a.ccForoshandeh, a.ccAfradForoshandeh, SUM(a.Rial) AS rial
+    FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
+    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
+    GROUP BY a.ccForoshandeh, a.ccAfradForoshandeh
+),
+asli AS (
+    SELECT ccForoshandeh, ccAfradForoshandeh,
+           ROW_NUMBER() OVER (PARTITION BY ccForoshandeh ORDER BY rial DESC) AS rn,
+           COUNT(*)    OVER (PARTITION BY ccForoshandeh)                     AS n_people
+    FROM nafar
+),
+out AS (
+    SELECT f.ccForoshandeh, b.d_from, b.d_to, tv.rooz_kari,
+           LTRIM(RTRIM(ISNULL(p.FName, '') + ' ' + ISNULL(p.LName, ''))) AS person,
+           n.n_people, sh.tedad_ba_zarib,
+           v.visits_total, v.visits_positive,
+           s.invoice_line_count, a.invoice_count,
+           mo.faal_dar_tour, mo.kharid_karde,
+           a.gross_sales_amount, a.returns_amount
+    FROM Sales.Foroshandeh f
+    CROSS JOIN bazeh b
+    CROSS JOIN taghvim tv
+    JOIN amar a           ON a.ccForoshandeh = f.ccForoshandeh
+    JOIN shop sh          ON sh.ccForoshandeh = f.ccForoshandeh
+    LEFT JOIN satr s      ON s.ccForoshandeh = f.ccForoshandeh
+    LEFT JOIN vis  v      ON v.ccForoshandeh = f.ccForoshandeh
+    LEFT JOIN moshtary mo ON mo.ccForoshandeh = f.ccForoshandeh
+    LEFT JOIN asli n      ON n.ccForoshandeh = f.ccForoshandeh AND n.rn = 1
+    LEFT JOIN Global.Afrad p ON p.ccAfrad = n.ccAfradForoshandeh
+    WHERE f.ccNoeForoshandeh = 1 AND a.gross_sales_amount > 0
 )
-SELECT f.ccForoshandeh AS code, f.SharhForoshandeh AS name,
-       sh.weighted_shops, sh.rooz_kari,
-       v.visits_total, v.visits_positive,
-       s.invoice_line_count, a.invoice_count,
-       mo.customers_assigned, mo.customers_purchased,
-       CAST(a.gross_sales_amount AS bigint) AS gross_sales_amount,
-       CAST(a.returns_amount AS bigint)     AS returns_amount
-FROM Sales.Foroshandeh f
-JOIN amar a      ON a.ccForoshandeh = f.ccForoshandeh
-JOIN shop sh     ON sh.ccForoshandeh = f.ccForoshandeh
-LEFT JOIN satr s ON s.ccForoshandeh = f.ccForoshandeh
-LEFT JOIN vis  v ON v.ccForoshandeh = f.ccForoshandeh
-LEFT JOIN moshtary mo ON mo.ccForoshandeh = f.ccForoshandeh
-WHERE f.ccNoeForoshandeh = 1        -- درخواست‌گیر
-  AND a.gross_sales_amount > 0
-ORDER BY a.invoice_count DESC;
+SELECT ccForoshandeh AS code, person AS name, n_people, rooz_kari,
+       tedad_ba_zarib AS weighted_shops,
+       visits_total, visits_positive,
+       invoice_line_count, invoice_count,
+       faal_dar_tour AS customers_assigned, kharid_karde AS customers_purchased,
+       CAST(gross_sales_amount AS bigint) AS gross_sales_amount,
+       CAST(returns_amount AS bigint)     AS returns_amount,
+       CAST(d_from AS date) AS date_from, CAST(DATEADD(day,-1,d_to) AS date) AS date_to
+FROM out
+ORDER BY invoice_count DESC
 ```
 
 `Sales.AmarForosh_Arshive` مرکز ثقل است: یک سطر به ازای (تاریخ، فروشنده، مشتری،
@@ -141,48 +186,51 @@ WITH params AS (
     SELECT CAST('2026-08-22' AS date) AS rooz_arzyabi,
            1                          AS mahaneh
 ),
-taghvim AS (
-    SELECT TOP 1 c.Sal, c.Mah FROM Sales.HadafForoshRoozaneh c
-    JOIN params p ON c.Tarikh = p.rooz_arzyabi
-),
-dore AS (
-    SELECT t.Sal, t.Mah,
-           CASE WHEN p.mahaneh = 1
+bazeh AS (
+    SELECT CASE WHEN p.mahaneh = 1
                 THEN DATEADD(day, 1, DATEADD(month, -1, CAST(p.rooz_arzyabi AS datetime)))
                 ELSE CAST(p.rooz_arzyabi AS datetime) END AS d_from,
            DATEADD(day, 1, CAST(p.rooz_arzyabi AS datetime)) AS d_to,
-           (SELECT COUNT(DISTINCT c3.Tarikh) FROM Sales.HadafForoshRoozaneh c3
-            WHERE c3.Sal = t.Sal AND c3.Mah = t.Mah) AS rooz_mah,
-           CASE WHEN p.mahaneh = 1
-                THEN (SELECT COUNT(DISTINCT c4.Tarikh) FROM Sales.HadafForoshRoozaneh c4
-                      WHERE c4.Sal = t.Sal AND c4.Mah = t.Mah AND c4.Tarikh <= p.rooz_arzyabi)
-                ELSE 1 END AS rooz_dore
-    FROM params p CROSS JOIN taghvim t
+           p.rooz_arzyabi, p.mahaneh
+    FROM params p
+),
+taghvim AS (
+    SELECT COUNT(*) AS rooz_kari
+    FROM Global.Taghvim g CROSS JOIN bazeh b
+    WHERE g.Tarikh >= b.d_from AND g.Tarikh < b.d_to AND g.CodeNoeTatili IS NULL
+),
+taghvim_mah AS (
+    SELECT g.Sal, g.Mah,
+           (SELECT COUNT(*) FROM Global.Taghvim g2
+            WHERE g2.Sal = g.Sal AND g2.Mah = g.Mah AND g2.CodeNoeTatili IS NULL) AS rooz_mah
+    FROM Global.Taghvim g CROSS JOIN bazeh b
+    WHERE g.Tarikh = b.rooz_arzyabi
 ),
 naghsheh AS (
     SELECT DISTINCT ccKalaCode, ccGorohKala FROM Sales.AmarForosh_Arshive
-    WHERE Tarikh >= '2026-01-01'
+    WHERE Tarikh >= DATEADD(year, -1, GETDATE())
 ),
 hadaf AS (
     SELECT h.ccForoshandeh, k.ccGorohKala,
-           SUM(h.TedadHadaf) * MAX(d.rooz_dore) * 1.0 / NULLIF(MAX(d.rooz_mah), 0) AS target
+           SUM(h.TedadHadaf) * MAX(tv.rooz_kari) * 1.0 / NULLIF(MAX(tm.rooz_mah), 0) AS target
     FROM Sales.HadafForoshandeh_PG h
-    CROSS JOIN dore d
+    CROSS JOIN taghvim tv
+    CROSS JOIN taghvim_mah tm
     JOIN naghsheh k ON k.ccKalaCode = h.ccKalaCode
-    WHERE h.Sal = d.Sal AND h.Mah = d.Mah AND h.TedadHadaf > 0
+    WHERE h.Sal = tm.Sal AND h.Mah = tm.Mah AND h.TedadHadaf > 0
     GROUP BY h.ccForoshandeh, k.ccGorohKala
 ),
-actual AS (
+amal AS (
     SELECT a.ccForoshandeh, a.ccGorohKala, SUM(a.Tedad) AS tedad
-    FROM Sales.AmarForosh_Arshive a CROSS JOIN dore d
-    WHERE a.Tarikh >= d.d_from AND a.Tarikh < d.d_to AND a.IsMarjoee = 0
+    FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
+    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
     GROUP BY a.ccForoshandeh, a.ccGorohKala
 )
 SELECT h.ccForoshandeh AS code, h.ccGorohKala AS goroh,
        CAST(h.target AS decimal(18,2)) AS target,
        ISNULL(a.tedad, 0) AS sales
 FROM hadaf h
-LEFT JOIN actual a ON a.ccForoshandeh = h.ccForoshandeh AND a.ccGorohKala = h.ccGorohKala
+LEFT JOIN amal a ON a.ccForoshandeh = h.ccForoshandeh AND a.ccGorohKala = h.ccGorohKala
 WHERE h.target > 0
 ```
 
@@ -209,48 +257,19 @@ WHERE h.target > 0
 
 ## ۳. نام واقعی فروشنده
 
-`SharhForoshandeh` در این نصب کد است («فروشنده 1104106») و حتی تکراری — چند رکورد
-«فروشنده 0101» وجود دارد. برای گزارشی که آدم می‌خواند، نام لازم است:
+کوئری ۱ و کوئری کامل هر دو ستون `person` را می‌دهند، پس کوئری جدا لازم نیست.
+منطقش این است و در `asli`/`Global.Afrad` همان بالا هست:
 
-```sql
-WITH act AS (
-    SELECT ccForoshandeh, ccAfradForoshandeh, SUM(Rial) AS rial
-    FROM Sales.AmarForosh_Arshive
-    WHERE Tarikh >= '2026-07-23' AND Tarikh < '2026-08-23' AND IsMarjoee = 0
-    GROUP BY ccForoshandeh, ccAfradForoshandeh
-),
-ranked AS (
-    SELECT act.ccForoshandeh, act.ccAfradForoshandeh,
-           ROW_NUMBER() OVER (PARTITION BY act.ccForoshandeh ORDER BY act.rial DESC) AS rn,
-           COUNT(*)    OVER (PARTITION BY act.ccForoshandeh) AS n_people
-    FROM act
-)
-SELECT r.ccForoshandeh AS code,
-       LTRIM(RTRIM(ISNULL(p.FName, '') + ' ' + ISNULL(p.LName, ''))) AS person,
-       r.n_people
-FROM ranked r
-LEFT JOIN Global.Afrad p ON p.ccAfrad = r.ccAfradForoshandeh
-WHERE r.rn = 1;
-```
-
-**از `ccAfradForoshandeh` جدول آمار برو، نه از `Sales.Foroshandeh.ccAfrad`.** دومی
-برای ۵۲۱ رکورد از ۶۲۶ خالی است؛ اولی برای همه‌ی فروشنده‌های فعال نام می‌دهد
-(۱۱۴ از ۱۱۵ در مرداد ۱۴۰۵).
-
-### `ccForoshandeh` مسیر است، نه آدم
-
-در مرداد ۱۴۰۵: ۷۵ مسیر یک نفره، ۱۸ مسیر دونفره، ۱۸ مسیر سه‌نفره، ۳ مسیر
-چهارنفره. یعنی یک‌سوم مسیرها را در طول ماه بیش از یک نفر کار کرده‌اند و
-عددهایشان روی هم جمع شده.
-
-کوئری بالا نامِ نفری را می‌دهد که بیشترین فروش را روی آن مسیر داشته، و `n_people`
-می‌گوید چند نفر بوده‌اند. در گزارش، مسیرِ چندنفره را علامت بزن (مثلاً
-«احسان سپهری (+۱)») تا کسی نمره‌ی مشترک را به یک نفر نسبت ندهد.
-
-برگه‌ی اصلی اسمش «ارزیابی فروشنده **پرسنل**» است، پس اگر مدیر فروش ارزیابیِ
-شخص می‌خواهد نه مسیر، باید همه‌جا `ccAfradForoshandeh` کلیدِ گروه‌بندی شود نه
-`ccForoshandeh` — و آن‌وقت همه‌ی عددها عوض می‌شوند. این یک تصمیم است؛ خودت
-نگیرش.
+- **از `ccAfradForoshandeh` جدول آمار برو، نه از `Sales.Foroshandeh.ccAfrad`.**
+  دومی برای ۵۲۱ رکورد از ۶۲۶ خالی است؛ اولی برای همه‌ی فروشنده‌های فعال نام
+  می‌دهد (۱۱۴ از ۱۱۵ در یک ماه واقعی).
+- `ccForoshandeh` **مسیر** است نه آدم. در یک ماه واقعی ۷۵ مسیر یک‌نفره بود ولی
+  ۱۸ مسیر دونفره، ۱۸ مسیر سه‌نفره و ۳ مسیر چهارنفره. ستون `n_people` تعداد
+  نفرات را می‌گوید و نامی که برمی‌گردد نفری است که بیشترین فروش را داشته.
+  مسیر چندنفره را در گزارش علامت بزن.
+- برگه‌ی اصلی اسمش «ارزیابی فروشنده **پرسنل**» است. اگر مدیر فروش ارزیابیِ شخص
+  می‌خواهد نه مسیر، کلید گروه‌بندی باید همه‌جا `ccAfradForoshandeh` شود و
+  آن‌وقت همه‌ی عددها عوض می‌شوند. این تصمیم است؛ خودت نگیرش.
 
 ## ۴. ساختن ورودی اسکریپت
 
