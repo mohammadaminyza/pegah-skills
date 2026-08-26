@@ -19,7 +19,7 @@ examples/sample-input.json    نمونه ورودی کامل
 
 | معیار | جدول |
 |---|---|
-| ۱ تعداد مغازه وزنی | `Sales.AmarForosh_Arshive` (`ccNoeMoshtary` ۳۴۷/۳۴۸/۳۵۰) |
+| ۱ تعداد مغازه با ضریب | `Sales.AmarForosh_Arshive` (`ccNoeMoshtary` ۳۴۷/۳۴۸/۳۵۰) |
 | ۲ ویزیت مثبت | `Sales.VisitForoshandeh_Arshiv` |
 | ۳ اقلام هر فاکتور | `Sales.DarkhastFaktorSatr` |
 | ۴ مشتری خرید کرده | `AmarForosh_Arshive` ÷ `VisitForoshandeh_Arshiv` |

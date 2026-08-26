@@ -18,7 +18,7 @@
       "criteria": [
         {
           "key": "weighted_shops",
-          "label": "تعداد مغازه روز (وزنی)",
+          "label": "تعداد مغازه روز با ضریب",
           "unit": "واحد",
           "baseline": 25,
           "step": 1,
@@ -79,7 +79,7 @@
       "criteria": [
         {
           "key": "weighted_shops",
-          "label": "تعداد مغازه تا روز (وزنی)",
+          "label": "تعداد مغازه تا روز با ضریب",
           "unit": "واحد",
           "baseline": 280,
           "step": 5,
