@@ -1,0 +1,77 @@
+{
+  "scope": "لاین یک — مرداد ۱۴۰۵ (۲۰۲۶-۰۷-۲۳ تا ۲۰۲۶-۰۸-۲۲)",
+  "customers": [
+    {
+      "code": "20114",
+      "name": "سوپرمارکت میلاد",
+      "type": "khord",
+      "item_count": 812,
+      "visits_total": 22,
+      "visits_positive": 17,
+      "sku_count": 34
+    },
+    {
+      "code": "20233",
+      "name": "بقالی رضا",
+      "type": 347,
+      "item_count": 690,
+      "visits_total": 20,
+      "visits_positive": 12,
+      "sku_count": 27
+    },
+    {
+      "code": "20418",
+      "name": "خواربار سعید",
+      "type": "خرد",
+      "item_count": 505,
+      "visits_total": 18,
+      "visits_positive": 8,
+      "sku_count": 19
+    },
+    {
+      "code": "20502",
+      "name": "لبنیات کاوه",
+      "type": "khord",
+      "item_count": 300,
+      "visits_total": 4,
+      "visits_positive": 1,
+      "sku_count": 11
+    },
+    {
+      "code": "20777",
+      "name": "مینی‌مارکت آرش — بدون رکورد ویزیت",
+      "type": "khord",
+      "item_count": 640,
+      "visits_total": 0,
+      "visits_positive": 0,
+      "sku_count": 24
+    },
+    {
+      "code": "30021",
+      "name": "پخش البرز",
+      "type": "omde",
+      "item_count": 8400,
+      "visits_total": 19,
+      "visits_positive": 14,
+      "sku_count": 29
+    },
+    {
+      "code": "30044",
+      "name": "عمده‌فروشی نیک",
+      "type": 348,
+      "item_count": 5200,
+      "visits_total": 12,
+      "visits_positive": 6,
+      "sku_count": 22
+    },
+    {
+      "code": "30090",
+      "name": "توزیع مهر — کف ویزیت",
+      "type": "عمده",
+      "item_count": 7100,
+      "visits_total": 2,
+      "visits_positive": 1,
+      "sku_count": 26
+    }
+  ]
+}
