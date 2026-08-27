@@ -238,7 +238,7 @@ CASE WHEN mahaneh = 1 THEN (moshtary_pct - 80) * 0.5 END AS s_moshtary
 ```python
 import subprocess, sys
 r = subprocess.run(
-    [sys.executable, "skills/pegah-visitor-scoring/scripts/score.py",
+    [sys.executable, "skills/ارزیابی-فروشنده-پگاه/scripts/score.py",
      "input.json", "--period", "cumulative"],
     capture_output=True, text=True, encoding="utf-8")
 print(r.stdout or r.stderr)

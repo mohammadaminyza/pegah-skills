@@ -1,5 +1,5 @@
 ---
-name: pegah-visitor-scoring
+name: ارزیابی-فروشنده-پگاه
 description: محاسبه نمره ارزیابی فروشنده پگاه از روی دیتابیس pakhsh — ارزیابی روز و ارزیابی تا روز (ماه تا امروز) بر پایه تعداد مغازه با ضریب (خرد/عمده/زنجیره‌ای)، درصد ویزیت مثبت، میانگین سطر هر فاکتور، درصد مشتری خرید کرده، درصد فاکتور مرجوعی و درصد تحقق هدف گروه محصول. Load when asked to score, rank or compare salespeople — ارزیابی فروشنده، نمره فروشنده، ویزیت مثبت، مرجوعی، تحقق هدف، رتبه‌بندی ویزیتور.
 ---
 
@@ -63,7 +63,7 @@ description: محاسبه نمره ارزیابی فروشنده پگاه از �
    ```python
    import subprocess, sys
    r = subprocess.run(
-       [sys.executable, "skills/pegah-visitor-scoring/scripts/score.py",
+       [sys.executable, "skills/ارزیابی-فروشنده-پگاه/scripts/score.py",
         "input.json", "--period", "cumulative"],
        capture_output=True, text=True, encoding="utf-8")
    print(r.stdout or r.stderr)

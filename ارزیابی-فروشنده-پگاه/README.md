@@ -1,4 +1,4 @@
-# pegah-visitor-scoring
+# ارزیابی-فروشنده-پگاه
 
 اسکیل ارزیابی فروشنده پگاه، در فرمت استاندارد `SKILL.md`. مستقل است: این پوشه را
 هرجا بگذاری کار می‌کند.
@@ -46,7 +46,7 @@ examples/sample-input.json    نمونه ورودی کامل
 در بخش Skills، «افزودن از URL» و آدرس این پوشه در گیت‌هاب:
 
 ```
-https://github.com/<owner>/<repo>/tree/main/pegah-visitor-scoring
+https://github.com/<owner>/<repo>/tree/main/ارزیابی-فروشنده-پگاه
 ```
 
 کل پوشه با هم می‌آید. چون اسکریپت اجرایی دارد، اسکیل **خاموش** ایمپورت می‌شود؛
