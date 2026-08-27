@@ -1,17 +1,35 @@
 {
-  "version": "1405-05-31",
+  "version": "1405-06-05",
   "stepping": "continuous",
+  "bands": [
+    {
+      "min": 0.001,
+      "label": "عالی",
+      "note": "بالای صفر"
+    },
+    {
+      "min": -5,
+      "label": "معمولی",
+      "note": "بین صفر و منفی ۵"
+    },
+    {
+      "max": -5,
+      "label": "نیازمند تصمیم اساسی",
+      "note": "زیر منفی ۵ — بررسی و تصمیم مدیریتی"
+    }
+  ],
   "shop_weights": {
     "khord": 1,
     "omde": 3,
     "chain": 5
   },
-  "shop_weight_labels": {
-    "khord": "خرد",
-    "omde": "عمده",
-    "chain": "زنجیره‌ای"
+  "shop_type_codes": {
+    "khord": 347,
+    "omde": 348,
+    "chain": 350
   },
-  "return_basis": "amount",
+  "return_basis": "invoice_count",
+  "min_invoices": 5,
   "periods": {
     "daily": {
       "label": "ارزیابی فروشنده روز",
@@ -35,42 +53,22 @@
           "direction": "higher_is_better"
         },
         {
-          "key": "avg_items_per_invoice",
-          "label": "میانگین اقلام هر فاکتور",
-          "unit": "قلم",
+          "key": "avg_lines_per_invoice",
+          "label": "میانگین سطر هر فاکتور",
+          "unit": "سطر",
           "baseline": 6,
           "step": 1,
           "points_per_step": 0.5,
           "direction": "higher_is_better"
         },
         {
-          "key": "purchasing_customer_pct",
-          "label": "درصد مشتری خرید کرده در روز",
-          "unit": "٪",
-          "baseline": 80,
-          "step": 1,
-          "points_per_step": 0.5,
-          "direction": "higher_is_better",
-          "assumed": "برگه اصلی برای این معیار در ارزیابی روز قاعده‌ای نداشت؛ قاعده ارزیابی ماه اینجا تکرار شده."
-        },
-        {
           "key": "return_pct",
-          "label": "درصد مرجوعی",
+          "label": "درصد فاکتور مرجوعی",
           "unit": "٪",
           "baseline": 1,
           "step": 0.25,
           "points_per_step": 1,
           "direction": "lower_is_better"
-        },
-        {
-          "key": "target_achievement_pct",
-          "label": "درصد تحقق هدف گروه محصول",
-          "unit": "٪",
-          "baseline": 75,
-          "step": 1,
-          "points_per_step": 1,
-          "direction": "higher_is_better",
-          "aggregate": "mean_of_groups"
         }
       ]
     },
@@ -96,9 +94,9 @@
           "direction": "higher_is_better"
         },
         {
-          "key": "avg_items_per_invoice",
-          "label": "میانگین اقلام هر فاکتور",
-          "unit": "قلم",
+          "key": "avg_lines_per_invoice",
+          "label": "میانگین سطر هر فاکتور",
+          "unit": "سطر",
           "baseline": 6,
           "step": 1,
           "points_per_step": 0.5,
@@ -106,7 +104,7 @@
         },
         {
           "key": "purchasing_customer_pct",
-          "label": "درصد مشتری خرید کرده ماه",
+          "label": "درصد مشتری خرید کرده",
           "unit": "٪",
           "baseline": 80,
           "step": 1,
@@ -115,7 +113,7 @@
         },
         {
           "key": "return_pct",
-          "label": "درصد مرجوعی تا روز",
+          "label": "درصد فاکتور مرجوعی",
           "unit": "٪",
           "baseline": 1,
           "step": 0.25,
@@ -126,13 +124,13 @@
         },
         {
           "key": "target_achievement_pct",
-          "label": "درصد تحقق هدف گروه محصول",
+          "label": "درصد تحقق کل هدف",
           "unit": "٪",
           "baseline": 75,
           "step": 1,
           "points_per_step": 1,
           "direction": "higher_is_better",
-          "aggregate": "mean_of_groups"
+          "aggregate": "total"
         }
       ]
     }

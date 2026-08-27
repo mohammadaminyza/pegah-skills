@@ -40,12 +40,15 @@ def measure(key, person, rules):
         return weighted_shops(person, rules)
     if key == "positive_visit_pct":
         return ratio(person.get("visits_positive"), person.get("visits_total"))
-    if key == "avg_items_per_invoice":
+    if key == "avg_lines_per_invoice":
         return ratio(person.get("invoice_line_count"), person.get("invoice_count"), 1.0)
     if key == "purchasing_customer_pct":
         return ratio(person.get("customers_purchased"), person.get("customers_assigned"))
     if key == "return_pct":
-        if rules.get("return_basis") == "quantity":
+        basis = rules.get("return_basis", "invoice_count")
+        if basis == "invoice_count":
+            return ratio(person.get("returned_invoices"), person.get("invoice_count"))
+        if basis == "quantity":
             return ratio(person.get("returns_qty"), person.get("sold_qty"))
         return ratio(person.get("returns_amount"), person.get("gross_sales_amount"))
     return None
@@ -62,7 +65,11 @@ def points(criterion, value, stepping):
 
 
 def group_result(criterion, person, stepping):
-    """نمره معیار گروه محصول: هر گروه جدا، و میانگین نمره گروه‌ها."""
+    """نمره معیار هدف: جمع فروش تقسیم بر جمع هدفِ همه گروه‌ها — نه میانگین نسبت‌ها.
+
+    میانگینِ درصدِ تک‌تک گروه‌ها با یک گروهِ ریزِ پرتحقق تا چند صد درصد بالا
+    می‌رود؛ نسبت کل بین صفر و حدود ۱۲۰٪ می‌ماند.
+    """
     detail = []
     for group in person.get("product_groups") or []:
         achieved = group.get("achievement_pct")
@@ -73,15 +80,19 @@ def group_result(criterion, person, stepping):
         detail.append(
             {
                 "name": group.get("name") or "—",
+                "sales": float(group.get("sales") or 0),
+                "target": float(group.get("target") or 0),
                 "achievement_pct": round(achieved, 2),
-                "score": round(points(criterion, achieved, stepping), 2),
             }
         )
     if not detail:
         return None, None, []
-    mean_pct = sum(item["achievement_pct"] for item in detail) / len(detail)
-    mean_score = sum(item["score"] for item in detail) / len(detail)
-    return mean_pct, mean_score, detail
+    total_sales = sum(item["sales"] for item in detail)
+    total_target = sum(item["target"] for item in detail)
+    if not total_target:
+        return None, None, detail
+    overall = 100.0 * total_sales / total_target
+    return overall, points(criterion, overall, stepping), detail
 
 
 def evaluate(person, period, rules):
@@ -93,7 +104,7 @@ def evaluate(person, period, rules):
 
     for criterion in period["criteria"]:
         groups = []
-        if criterion.get("aggregate") == "mean_of_groups":
+        if criterion.get("aggregate"):
             value, score, groups = group_result(criterion, person, stepping)
         else:
             value = measure(criterion["key"], person, rules)
@@ -123,7 +134,9 @@ def evaluate(person, period, rules):
             }
         )
 
+    total_value = 0.0 if knockout else round(total, 2)
     return {
+        "band": "" if knockout else band(total_value, rules),
         "name": person.get("name") or person.get("code") or "—",
         "code": person.get("code"),
         "criteria": rows,
@@ -132,8 +145,19 @@ def evaluate(person, period, rules):
         "missing": missing,
         "knockout": knockout,
         "raw_total": round(total, 2),
-        "total": 0.0 if knockout else round(total, 2),
+        "total": total_value,
     }
+
+
+def band(total, rules):
+    """برچسب عملکرد: عالی / معمولی / نیازمند تصمیم اساسی."""
+    for entry in rules.get("bands") or []:
+        low, high = entry.get("min"), entry.get("max")
+        if low is not None and total >= low:
+            return entry["label"]
+        if high is not None and total < high:
+            return entry["label"]
+    return ""
 
 
 def number(value):
@@ -147,14 +171,15 @@ def render(report):
     if report.get("scope"):
         heading += f" — {report['scope']}"
     lines = [heading, ""]
-    lines.append("| رتبه | فروشنده | نمره کل | معیارهای محاسبه‌شده | توضیح |")
-    lines.append("|---:|---|---:|:---:|---|")
+    lines.append("| رتبه | فروشنده | نمره کل | وضعیت | معیارهای محاسبه‌شده | توضیح |")
+    lines.append("|---:|---|---:|---|:---:|---|")
     for rank, result in enumerate(report["results"], start=1):
         note = result["knockout"] or ""
         if not note and result["missing"]:
             note = "بدون داده: " + "، ".join(result["missing"])
         lines.append(
             f"| {rank} | {result['name']} | {number(result['total'])} | "
+            f"{result.get('band', '')} | "
             f"{result['scored_count']}/{result['criteria_count']} | {note} |"
         )
 

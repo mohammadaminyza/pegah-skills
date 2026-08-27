@@ -1,58 +1,68 @@
 {
   "period": "cumulative",
-  "scope": "شعبه تهران — ۱۴۰۵/۰۵/۰۱ تا ۱۴۰۵/۰۵/۳۱",
+  "scope": "لاین یک — مرداد ۱۴۰۵ (۲۰۲۶-۰۷-۲۳ تا ۲۰۲۶-۰۸-۲۲)",
   "salespeople": [
     {
-      "code": "1042",
-      "name": "رضایی",
-      "shops": { "khord": 168, "omde": 24, "chain": 6 },
-      "visits_total": 612,
-      "visits_positive": 281,
-      "invoice_count": 281,
-      "invoice_line_count": 1996,
+      "code": "1017",
+      "name": "رسول دهقان",
+      "weighted_shops": 362,
+      "visits_total": 646,
+      "visits_positive": 363,
+      "invoice_line_count": 2100,
+      "invoice_count": 350,
+      "customers_assigned": 300,
+      "customers_purchased": 244,
+      "returned_invoices": 2,
+      "product_groups": [
+        {
+          "name": "سس مایونز",
+          "sales": 1620,
+          "target": 1800
+        },
+        {
+          "name": "کنسرو",
+          "sales": 980,
+          "target": 1150
+        }
+      ]
+    },
+    {
+      "code": "1018",
+      "name": "سيدمجتبي حسيني رمقاني (+۲)",
+      "weighted_shops": 388,
+      "visits_total": 650,
+      "visits_positive": 346,
+      "invoice_line_count": 2400,
+      "invoice_count": 346,
+      "customers_assigned": 296,
+      "customers_purchased": 230,
+      "returned_invoices": 3,
+      "product_groups": [
+        {
+          "name": "سس مایونز",
+          "sales": 1500,
+          "target": 1900
+        }
+      ]
+    },
+    {
+      "code": "984",
+      "name": "نمونه‌ی حذف‌شده — مرجوعی بالای ۲٪",
+      "weighted_shops": 250,
+      "visits_total": 500,
+      "visits_positive": 190,
+      "invoice_line_count": 1000,
+      "invoice_count": 190,
       "customers_assigned": 240,
-      "customers_purchased": 201,
-      "returns_amount": 34200000,
-      "gross_sales_amount": 4180000000,
+      "customers_purchased": 150,
+      "returned_invoices": 6,
       "product_groups": [
-        { "name": "شیر", "sales": 1620000000, "target": 1800000000 },
-        { "name": "ماست", "sales": 980000000, "target": 1150000000 },
-        { "name": "پنیر", "sales": 720000000, "target": 800000000 },
-        { "name": "دوغ", "sales": 410000000, "target": 430000000 }
+        {
+          "name": "سس مایونز",
+          "sales": 700,
+          "target": 1400
+        }
       ]
-    },
-    {
-      "code": "1077",
-      "name": "کریمی",
-      "shops": { "khord": 121, "omde": 11, "chain": 2 },
-      "visits_total": 548,
-      "visits_positive": 189,
-      "invoice_count": 189,
-      "invoice_line_count": 964,
-      "customers_assigned": 226,
-      "customers_purchased": 158,
-      "returns_amount": 61500000,
-      "gross_sales_amount": 2340000000,
-      "product_groups": [
-        { "name": "شیر", "achievement_pct": 71.4 },
-        { "name": "ماست", "achievement_pct": 66.2 },
-        { "name": "پنیر", "achievement_pct": 80.9 },
-        { "name": "دوغ", "achievement_pct": 58.0 }
-      ]
-    },
-    {
-      "code": "1090",
-      "name": "موسوی — سیستم ویزیت ندارد",
-      "weighted_shops": 244,
-      "visits_total": null,
-      "visits_positive": null,
-      "invoice_count": 176,
-      "invoice_line_count": 1108,
-      "customers_assigned": 198,
-      "customers_purchased": 149,
-      "returns_amount": 9800000,
-      "gross_sales_amount": 1960000000,
-      "product_groups": [{ "name": "شیر", "sales": 1500000000, "target": 1900000000 }]
     }
   ]
 }

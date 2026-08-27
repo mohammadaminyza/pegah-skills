@@ -17,26 +17,29 @@ examples/sample-input.json    نمونه ورودی کامل
 
 روی دیتابیس `pakhsh` (SQL Server) نوشته و تست شده:
 
-| معیار | جدول |
+| معیار | منبع |
 |---|---|
 | ۱ تعداد مغازه با ضریب | `Sales.AmarForosh_Arshive` (`ccNoeMoshtary` ۳۴۷/۳۴۸/۳۵۰) |
-| ۲ ویزیت مثبت | `Sales.VisitForoshandeh_Arshiv` |
-| ۳ اقلام هر فاکتور | `Sales.DarkhastFaktorSatr` |
-| ۴ مشتری خرید کرده | `AmarForosh_Arshive` ÷ `VisitForoshandeh_Arshiv` |
-| ۵ مرجوعی | `Sales.AmarForosh_Arshive.IsMarjoee` |
-| ۶ هدف گروه محصول | `Sales.HadafForoshandeh_PG` + `AmarForosh_Arshive` |
+| ۲ درصد ویزیت مثبت | `Sales.VisitForoshandeh_Arshiv` — رویدادِ ویزیت |
+| ۳ میانگین سطر هر فاکتور | `Sales.DarkhastFaktorSatr` — `COUNT(*)` |
+| ۴ درصد مشتری خرید کرده | `VisitForoshandeh_Arshiv` — مشتریِ متمایز (فقط ماهانه) |
+| ۵ درصد فاکتور مرجوعی | `AmarForosh_Arshive` — فاکتور مرجوعی‌دار ÷ کل فاکتور |
+| ۶ درصد تحقق کل هدف | `Sales.HadafForoshRoozanehNew` (فقط ماهانه) |
+| تقویم | `Global.Taghvim` (`CodeNoeTatili IS NULL`) |
+| گروه محصول | `Global.vGorohMahsol` با `ccGorohLink = 560` |
+| لاین فروش | `Global.SazmanForosh` |
+| نام فروشنده | `Global.Afrad` از `ccAfradForoshandeh` |
 
-`Sales.AmarForosh_Arshive` مرکز ثقل است: ۲۳ میلیون سطر، تا امروز به‌روز، و چون
-فروش و مرجوعی هر دو در آن‌اند، صورت و مخرجِ درصد مرجوعی از یک تعریف می‌آیند.
+**دوره‌ی روزانه چهار معیار دارد، دوره‌ی «تا روز» شش تا.**
 
-سه تله که وقت زیادی می‌گیرند اگر از قبل ندانی:
+چهار تله که وقت زیادی می‌گیرند اگر از قبل ندانی:
 
-- `Sales.AmalkardRozanehForosh` و `Sales.HadafForosh` دقیقاً به اسمِ همین کارند و
-  از **۲۰۱۸** به‌روز نمی‌شوند. جست‌وجوی اسکیما اول همین‌ها را می‌آورد.
-- `Sales.ElamMarjoee` **اعلامِ** مرجوعی است نه مرجوعیِ ثبت‌شده. زنده است و جواب
-  می‌دهد، ولی ۱۰ تا ۲۵ برابر کمتر — با آن هیچ‌کس به خط حذفِ ۲٪ نمی‌رسد.
-- بدون فیلتر `Sales.Foroshandeh.ccNoeForoshandeh = 1` (درخواست‌گیر)، سرپرست و
-  رییس مرکز با نمره‌های سه‌رقمی صدر جدول را می‌گیرند.
+- `Sales.AmalkardRozanehForosh` و `Sales.HadafForosh` از **۲۰۱۸** به‌روز
+  نمی‌شوند و اسمشان دقیقاً همین کار است.
+- `Sales.ElamMarjoee` **اعلامِ** مرجوعی است نه مرجوعیِ ثبت‌شده — ۱۰ تا ۲۵ برابر
+  کمتر.
+- بدون فیلتر `ccNoeForoshandeh = 1`، سرپرست و رییس مرکز صدر جدول را می‌گیرند.
+- معیار ۶ اگر میانگینِ گروه‌ها گرفته شود تا ۴۲۳٪ بالا می‌رود؛ نسبت کل درست است.
 
 ## ایمپورت
 
