@@ -10,6 +10,9 @@ from pathlib import Path
 
 RULES_PATH = Path(__file__).resolve().parent.parent / "rules.json"
 
+SATURATION_SHARE = 80.0
+SATURATION_MIN_SAMPLE = 5
+
 
 def ratio(numerator, denominator, scale=100.0):
     if numerator is None or not denominator:
@@ -115,6 +118,53 @@ def evaluate(customer, rules):
     }
 
 
+def positions(results):
+    """جایگاه رقابتی درون یک نوع مشتری — هم‌نمره‌ها یک جایگاه می‌گیرند (۱، ۲، ۲، ۴)."""
+    places = []
+    for index, result in enumerate(results):
+        tied = (
+            index
+            and not result["missing"]
+            and not results[index - 1]["missing"]
+            and result["total"] == results[index - 1]["total"]
+        )
+        places.append(places[-1] if tied else index + 1)
+    return places
+
+
+def saturation(results, rules):
+    """معیارهایی که به تقریباً همه یک رتبه داده‌اند — یعنی در این بازه تمایز نمی‌دهند."""
+    if len(results) < SATURATION_MIN_SAMPLE:
+        return []
+    rows = []
+    for index, criterion in enumerate(rules["criteria"]):
+        ranks = [
+            result["criteria"][index]["rank"]
+            for result in results
+            if result["criteria"][index]["rank"] is not None
+        ]
+        if not ranks:
+            continue
+        common = max(set(ranks), key=ranks.count)
+        share = 100.0 * ranks.count(common) / len(ranks)
+        if share < SATURATION_SHARE:
+            continue
+        rows.append(
+            f"- **{criterion['label']}** — رتبه {common} برای {ranks.count(common)} از "
+            f"{len(ranks)} مشتری ({share:.0f}٪)."
+        )
+    if not rows:
+        return []
+    return [
+        "**هشدار — این معیارها در این بازه تمایز نمی‌دهند:**",
+        "",
+        *rows,
+        "",
+        "آستانه‌ی این معیار برای این نوع مشتری با واقعیتِ بازه نمی‌خواند. نمره را دست "
+        "نزن؛ آستانه را با مدیر فروش چک کن و با `scripts/rules.py` عوضش کن.",
+    ]
+
+
 def number(value):
     if value is None:
         return "—"
@@ -160,7 +210,7 @@ def render(report, rules):
             lines.append(
                 "|---:|---|---|" + "---:|" * len(rules["criteria"]) + "---:|---|---|"
             )
-            for position, result in enumerate(results, start=1):
+            for result in results:
                 note = ""
                 if result["missing"]:
                     note = (
@@ -174,12 +224,15 @@ def render(report, rules):
                 if result["missing"]:
                     score += f" از {result['possible']}"
                 lines.append(
-                    f"| {position} | {result['name']} | {result['code']} | {cells} | "
-                    f"{score} | {result['grade'] or '—'} | {note} |"
+                    f"| {result['position']} | {result['name']} | {result['code']} | "
+                    f"{cells} | {score} | {result['grade'] or '—'} | {note} |"
                 )
             lines.append("")
 
         lines += distribution(results, rules) + [""]
+        warning = saturation(results, rules)
+        if warning:
+            lines += warning + [""]
 
     if not report["summary_only"] and any(
         result["weak_visits"] for result in report["results"]
@@ -190,10 +243,19 @@ def render(report, rules):
             "",
         ]
 
-    lines.append(
-        "نمره = (رتبه اقلام × ۳) + (رتبه ویزیت مثبت × ۴) + (رتبه SKU × ۵). "
-        "عدد داخل پرانتز رتبه‌ی همان معیار است."
+    formula = " + ".join(
+        f"(رتبه {criterion['label']} × {criterion['weight']})"
+        for criterion in rules["criteria"]
     )
+    lines += [
+        f"نمره = {formula}. عدد داخل پرانتز رتبه‌ی همان معیار است.",
+        "",
+        "**خرد و عمده دو جدول جدا هستند و در یک جدول با هم مرتب نمی‌شوند** — "
+        "آستانه‌هایشان فرق می‌کند، پس نمره‌شان با هم مقایسه‌شدنی است ولی «تعداد اقلام» "
+        "خامشان نه. هم‌نمره‌ها یک جایگاه دارند و ترتیبشان در جدول معنا ندارد.",
+        "",
+        f"قواعد: نسخه‌ی {report.get('rules_version')}.",
+    ]
     return "\n".join(lines)
 
 
@@ -220,7 +282,9 @@ def main():
     args = parser.parse_args()
 
     # وگرنه روی کنسول ویندوز، خروجی فارسی با UnicodeEncodeError می‌افتد.
+    # stderr هم لازم است: پیام‌های خطا فارسی‌اند و از همان‌جا بیرون می‌روند.
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
     rules = json.loads(Path(args.rules).read_text(encoding="utf-8-sig"))
     payload = read_input(args.input)
@@ -233,12 +297,21 @@ def main():
         raise SystemExit(f"نوع '{args.type}' تعریف نشده. نوع‌های موجود: {available}.")
 
     # مشتریِ ناقص پایین‌تر از مشتریِ کامل می‌نشیند؛ نمره‌ی ناقص با نمره‌ی کامل
-    # قابل مقایسه نیست.
+    # قابل مقایسه نیست. کد مشتری فقط برای اینکه دو اجرای یکسان یک ترتیب بدهند —
+    # بین هم‌نمره‌ها ترتیب معنا ندارد و جایگاهشان هم مشترک است.
     results = sorted(
         (evaluate(customer, rules) for customer in customers),
-        key=lambda result: (not result["missing"], result["total"]),
-        reverse=True,
+        key=lambda result: (
+            bool(result["missing"]),
+            -result["total"],
+            str(result["code"] or ""),
+        ),
     )
+    for kind in rules["customer_types"]:
+        group = [result for result in results if result["type"] == kind]
+        for result, place in zip(group, positions(group)):
+            result["position"] = place
+
     if args.type:
         results = [result for result in results if result["type"] == args.type]
 

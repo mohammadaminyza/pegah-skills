@@ -9,10 +9,9 @@
       "visits_total": 646,
       "visits_positive": 363,
       "invoice_line_count": 2100,
-      "invoice_count": 350,
+      "invoice_count": 348,
       "customers_assigned": 300,
       "customers_purchased": 244,
-      "returned_invoices": 2,
       "product_groups": [
         {
           "name": "سس مایونز",
@@ -24,7 +23,9 @@
           "sales": 980,
           "target": 1150
         }
-      ]
+      ],
+      "sold_qty": 52000,
+      "returns_qty": 210
     },
     {
       "code": "1018",
@@ -33,36 +34,38 @@
       "visits_total": 650,
       "visits_positive": 346,
       "invoice_line_count": 2400,
-      "invoice_count": 346,
+      "invoice_count": 343,
       "customers_assigned": 296,
       "customers_purchased": 230,
-      "returned_invoices": 3,
       "product_groups": [
         {
           "name": "سس مایونز",
           "sales": 1500,
           "target": 1900
         }
-      ]
+      ],
+      "sold_qty": 48000,
+      "returns_qty": 430
     },
     {
       "code": "984",
-      "name": "نمونه‌ی حذف‌شده — مرجوعی بالای ۲٪",
+      "name": "نمونه‌ی حذف‌شده — مرجوعی مبنادار بالای ۲٪",
       "weighted_shops": 250,
       "visits_total": 500,
       "visits_positive": 190,
       "invoice_line_count": 1000,
-      "invoice_count": 190,
+      "invoice_count": 184,
       "customers_assigned": 240,
       "customers_purchased": 150,
-      "returned_invoices": 6,
       "product_groups": [
         {
           "name": "سس مایونز",
           "sales": 700,
           "target": 1400
         }
-      ]
+      ],
+      "sold_qty": 30000,
+      "returns_qty": 750
     }
   ]
 }

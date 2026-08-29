@@ -2,6 +2,11 @@
 
 دیتابیس `pakhsh`.
 
+> **کوئری فقط متریکِ خام می‌دهد؛ رتبه و نمره کارِ `rank.py` است.** آستانه‌ها یک
+> جا زندگی می‌کنند — `rules.json`. اگر `CASE`ی برای رتبه‌دادن به SQL اضافه کنی،
+> اولین باری که کسی آستانه را با `rules.py` عوض کند، کوئری و اسکریپت دو جواب
+> متفاوت می‌دهند و هیچ‌کدام غلط به نظر نمی‌رسند.
+
 > **این کوئری‌ها روی این دیتابیس اجرا نشده‌اند.** جدول‌ها، ستون‌ها و فیلترها از
 > کوئری تست‌شده‌ی اسکیل «ارزیابی فروشنده پگاه» برداشته شده‌اند، ولی کلید
 > گروه‌بندی عوض شده (`ccMoshtary` به جای `ccForoshandeh`). بار اول بخش
@@ -17,7 +22,7 @@
 SELECT MAX(Tarikh) AS akharin FROM Sales.AmarForosh_Arshive
 ```
 
-## ۱. رتبه‌بندی مشتریانِ فعال — بدون هیچ ناشناخته‌ای
+## ۱. متریکِ خام مشتریانِ فعال
 
 مشتریانی که در بازه خرید داشته‌اند. **تنها بلوک `params` را عوض می‌کنی.**
 
@@ -54,70 +59,32 @@ vizit AS (
       AND v.IsTatil = 0
       AND (b.sazman_forosh IS NULL OR v.ccSazmanForosh = b.sazman_forosh)
     GROUP BY v.ccMoshtary
-),
-calc AS (
-    SELECT k.ccMoshtary, k.noe_moshtary, k.tedad_aghlam, k.tedad_sku, k.tedad_faktor,
-           z.vizit_rafteh, z.vizit_mosbat,
-           100.0 * z.vizit_mosbat / NULLIF(z.vizit_rafteh, 0) AS vizit_pct
-    FROM kharid k
-    LEFT JOIN vizit z ON z.ccMoshtary = k.ccMoshtary
-    WHERE k.noe_moshtary IN (347, 348)
-),
-rotbeh AS (
-    SELECT calc.*,
-           CASE WHEN noe_moshtary = 347 THEN
-                     CASE WHEN tedad_aghlam >= 751  THEN 5 WHEN tedad_aghlam >= 650  THEN 4
-                          WHEN tedad_aghlam >= 550  THEN 3 WHEN tedad_aghlam >= 450  THEN 2 ELSE 1 END
-                ELSE CASE WHEN tedad_aghlam >= 7501 THEN 5 WHEN tedad_aghlam >= 6500 THEN 4
-                          WHEN tedad_aghlam >= 5500 THEN 3 WHEN tedad_aghlam >= 4500 THEN 2 ELSE 1 END
-           END AS r_aghlam,
-           CASE WHEN vizit_pct IS NULL THEN NULL
-                WHEN vizit_pct >= 70 THEN 5 WHEN vizit_pct >= 60 THEN 4
-                WHEN vizit_pct >= 50 THEN 3 WHEN vizit_pct >= 40 THEN 2 ELSE 1 END AS r_vizit,
-           CASE WHEN tedad_sku >= 31 THEN 5 WHEN tedad_sku >= 26 THEN 4
-                WHEN tedad_sku >= 21 THEN 3 WHEN tedad_sku >= 16 THEN 2 ELSE 1 END AS r_sku
-    FROM calc
-),
-nomreh AS (
-    SELECT rotbeh.*, r_aghlam * 3 + r_vizit * 4 + r_sku * 5 AS nomreh_kol
-    FROM rotbeh
 )
-SELECT ROW_NUMBER() OVER (ORDER BY CASE WHEN nomreh_kol IS NULL THEN 1 ELSE 0 END,
-                                   nomreh_kol DESC)              AS "ردیف",
-       n.ccMoshtary                                              AS "کد مشتری",
-       CASE n.noe_moshtary WHEN 347 THEN N'خرد' WHEN 348 THEN N'عمده' END AS "نوع",
-       n.nomreh_kol                                              AS "نمره",
-       CASE WHEN n.nomreh_kol IS NULL  THEN N'ناقص — بدون رکورد ویزیت'
-            WHEN n.nomreh_kol >= 54    THEN N'سوپر ممتاز'
-            WHEN n.nomreh_kol >= 42    THEN N'ممتاز'
-            WHEN n.nomreh_kol >= 30    THEN N'درجه ۱'
-            WHEN n.nomreh_kol >= 18    THEN N'درجه ۲'
-            ELSE N'درجه ۳' END                                   AS "رتبه",
-       n.tedad_aghlam                                            AS "تعداد اقلام",
-       n.r_aghlam                                                AS "رتبه اقلام",
-       CAST(n.vizit_pct AS decimal(6,2))                         AS "درصد ویزیت مثبت",
-       n.r_vizit                                                 AS "رتبه ویزیت",
-       n.tedad_sku                                               AS "تعداد SKU",
-       n.r_sku                                                   AS "رتبه SKU",
-       n.vizit_rafteh                                            AS "ویزیت رفته",
-       n.vizit_mosbat                                            AS "ویزیت مثبت",
-       n.tedad_faktor                                            AS "تعداد فاکتور",
-       CAST(b.d_from AS date)                                    AS "از",
-       CAST(DATEADD(day, -1, b.d_to) AS date)                    AS "تا",
-       ISNULL(sz.NameSazmanForosh, N'همه لاین‌ها')                AS "لاین فروش"
-FROM nomreh n
+SELECT k.ccMoshtary                                          AS "کد مشتری",
+       k.noe_moshtary                                        AS "نوع",
+       k.tedad_aghlam                                        AS "تعداد اقلام",
+       z.vizit_rafteh                                        AS "ویزیت رفته",
+       z.vizit_mosbat                                        AS "ویزیت مثبت",
+       k.tedad_sku                                           AS "تعداد SKU",
+       k.tedad_faktor                                        AS "تعداد فاکتور",
+       CAST(b.d_from AS date)                                AS "از",
+       CAST(DATEADD(day, -1, b.d_to) AS date)                AS "تا",
+       ISNULL(sz.NameSazmanForosh, N'همه لاین‌ها')            AS "لاین فروش"
+FROM kharid k
 CROSS JOIN bazeh b
+LEFT JOIN vizit z ON z.ccMoshtary = k.ccMoshtary
 LEFT JOIN Global.SazmanForosh sz ON sz.ccSazmanForosh = b.sazman_forosh
-ORDER BY CASE WHEN n.nomreh_kol IS NULL THEN 1 ELSE 0 END, n.nomreh_kol DESC
+WHERE k.noe_moshtary IN (347, 348)
+ORDER BY k.noe_moshtary, k.tedad_aghlam DESC
 ```
 
 سه نکته‌ی این کوئری که اگر دست ببری خراب می‌شود:
 
-- **`r_vizit` وقتی ویزیتی نیست `NULL` می‌ماند، نه ۱.** مشتریِ ویزیت‌نشده با
-  مشتریِ ویزیت‌شده‌ی نخریده یکی نیست. `NULL` باعث می‌شود `nomreh_kol` هم `NULL`
-  شود و آن مشتری «ناقص» گزارش شود — همان کاری که `rank.py` می‌کند.
-- **`noe_moshtary` با `MAX` درمی‌آید.** اگر یک مشتری سطرهایی با دو کد نوع داشته
-  باشد، بزرگ‌ترش برنده می‌شود. اعتبارسنجی پایین این را چک می‌کند.
+- **`ORDER BY` اینجا رتبه‌بندی نیست**، فقط برای خواندن است. مشتریِ بالای این
+  خروجی «مشتری برتر» نیست — نمره را `rank.py` می‌دهد.
+- **ویزیتِ نبوده `NULL` می‌ماند، نه صفر.** مشتریِ ویزیت‌نشده با مشتریِ ویزیت‌شده‌ی
+  نخریده یکی نیست؛ `rank.py` اولی را «بدون داده» می‌گیرد و رتبه نمی‌دهد. اگر
+  اینجا `ISNULL(...,0)` بگذاری، آن مشتری به‌جای «ناقص»، رتبه ۱ می‌گیرد.
 - **`IsMarjoee = 0` در `kharid` هست ولی در `vizit` معنایی ندارد.** ویزیتِ منجر
   به فاکتورِ بعداً مرجوعی‌شده، همچنان ویزیت مثبت است.
 
@@ -144,15 +111,16 @@ ORDER BY tedad_sotoon DESC
 ```sql
 -- به‌جای  FROM kharid k  LEFT JOIN vizit z ...
 FROM <مستر مشتری> m
+CROSS JOIN bazeh b
 LEFT JOIN kharid k ON k.ccMoshtary = m.ccMoshtary
 LEFT JOIN vizit  z ON z.ccMoshtary = m.ccMoshtary
 WHERE m.ccNoeMoshtary IN (347, 348)
   AND m.<پرچم فعال> = 1
 ```
 
-و در `calc`، `ISNULL(k.tedad_aghlam, 0)` و `ISNULL(k.tedad_sku, 0)` بگذار — مشتریِ
-بی‌خرید صفر می‌گیرد و رتبه ۱، که درست است. ویزیتش را `ISNULL` **نکن**؛ نبودِ
-ویزیت همچنان «بدون داده» است.
+و `ISNULL(k.tedad_aghlam, 0)` و `ISNULL(k.tedad_sku, 0)` بگذار — مشتریِ بی‌خرید
+صفر می‌گیرد و رتبه ۱، که درست است. ویزیتش را `ISNULL` **نکن**؛ نبودِ ویزیت
+همچنان «بدون داده» است.
 
 تا وقتی این را نساخته‌ای، در تیتر گزارش بنویس «مشتریان **فعال** (دارای خرید در
 بازه)» — نه «مشتریان».
@@ -165,7 +133,7 @@ WHERE m.ccNoeMoshtary IN (347, 348)
 |---|---|
 | `کد مشتری` | `code` |
 | نام (از مستر) | `name` |
-| `نوع` یا `ccNoeMoshtary` | `type` — `khord`/`omde`، یا `خرد`/`عمده`، یا ۳۴۷/۳۴۸ |
+| `نوع` | `type` — کد ۳۴۷/۳۴۸، یا `khord`/`omde`، یا `خرد`/`عمده` |
 | `تعداد اقلام` | `item_count` |
 | `ویزیت رفته` | `visits_total` |
 | `ویزیت مثبت` | `visits_positive` |
@@ -213,14 +181,88 @@ SELECT COUNT(*) AS moshtary_chand_noe FROM (
 
 اگر صفر نبود، در گزارش بگو چند نفر و با کدام قاعده نوعشان انتخاب شده.
 
-**۳. سه عددی که باید معقول باشند.** خروجی را به `rank.py --summary` بده و نگاه
-کن:
+**۳. آستانه‌ها باید تمایز بدهند — از دو طرف.** خروجی را به `rank.py --summary`
+بده. `rank.py` خودش هشدار می‌دهد وقتی یک معیار به بیش از ۸۰٪ مشتریانِ یک نوع
+**یک** رتبه داده؛ آن هشدار را جدی بگیر، چون معیارِ اشباع‌شده در نمره هست ولی
+هیچ‌کس را از هیچ‌کس جدا نمی‌کند:
 
-- **میانه‌ی تعداد اقلامِ خرد** باید حوالی وسط جدول (۵۵۰) باشد. اگر ۵۰ است،
-  «تعداد اقلام» را سطر گرفته‌ای نه واحد. اگر ۵۰۰۰ است، بازه بلندتر از یک ماه
-  است.
-- **توزیع رتبه‌ها** باید پخش باشد. اگر بیش از نیمی درجه ۳ شدند، اول بازه را چک
-  کن، نه آستانه‌ها را.
-- **سهم مشتریانِ بدون رکورد ویزیت.** اگر بالاست، یعنی `VisitForoshandeh_Arshiv`
-  آن لاین را ندارد و رتبه‌ی ویزیت برای بخش بزرگی از جدول محاسبه نشده — این را
-  باید بالای گزارش گفت.
+- **همه ته جدول** (رتبه ۱) — معمولاً بازه کوتاه‌تر از آن است که آستانه فرض
+  می‌کند، یا «تعداد اقلام» را سطر گرفته‌ای نه واحد. اول بازه را چک کن.
+- **همه سرِ جدول** (رتبه ۵) — آستانه برای این نوع مشتری خیلی پایین است. این همان
+  چیزی است که در گزارش مرداد ۱۴۰۵ رخ داد: کم‌ترین عمده‌ی جدول ۱۱٬۱۹۰ قلم خرید
+  داشت و سقفِ آستانه‌ی عمده ۷۵۰۱ قلم بود، پس هر ده مشتری نمره‌ی کامل گرفتند و
+  جدول عملاً بی‌ترتیب شد.
+- **میانه‌ی هر نوع** را نگاه کن: باید حوالی وسط جدول آستانه‌ها بیفتد، نه بیرونش.
+
+اگر آستانه‌ای باید عوض شود، اول کوئری کالیبراسیون پایین را بزن، بعد
+`scripts/rules.py set <معیار>.<نوع> ...` — نه دستی و نه با حدس.
+
+**۴. سهم مشتریانِ بدون رکورد ویزیت.** اگر بالاست، یعنی `VisitForoshandeh_Arshiv`
+آن لاین را ندارد و رتبه‌ی ویزیت برای بخش بزرگی از جدول محاسبه نشده — این را باید
+بالای گزارش گفت.
+
+## کالیبره کردن آستانه — وقتی هشدار اشباع آمد
+
+**آستانه را از توزیعِ همه‌ی مشتریانِ آن نوع دربیاور، نه از چند نفر بالای جدول.**
+پنج مشتریِ برترِ عمده همه ته توزیع نیستند، سرش‌اند؛ آستانه‌ای که از آن‌ها ساخته
+شود همان اشباع را از آن طرف تکرار می‌کند.
+
+صدک‌های ۲۰ / ۴۰ / ۶۰ / ۸۰ چهار عددی‌اند که هر رتبه را حدوداً یک‌پنجم مشتریان
+می‌کنند — نقطه‌ی شروعِ گفت‌وگو با مدیر فروش، نه جواب نهایی:
+
+```sql
+WITH params AS (
+    SELECT CAST('2026-08-22' AS date) AS rooz_payan,
+           1                          AS tedad_mah,
+           CAST(NULL AS int)          AS sazman_forosh
+),
+bazeh AS (
+    SELECT DATEADD(day, 1, DATEADD(month, -p.tedad_mah, CAST(p.rooz_payan AS datetime))) AS d_from,
+           DATEADD(day, 1, CAST(p.rooz_payan AS datetime))                                AS d_to,
+           p.sazman_forosh
+    FROM params p
+),
+kharid AS (
+    SELECT a.ccMoshtary,
+           MAX(a.ccNoeMoshtary)         AS noe_moshtary,
+           SUM(a.Tedad)                 AS tedad_aghlam,
+           COUNT(DISTINCT a.ccKalaCode) AS tedad_sku
+    FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
+    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to
+      AND a.IsMarjoee = 0
+      AND (b.sazman_forosh IS NULL OR a.ccSazmanForosh = b.sazman_forosh)
+    GROUP BY a.ccMoshtary
+)
+SELECT DISTINCT
+    CASE noe_moshtary WHEN 347 THEN N'خرد' WHEN 348 THEN N'عمده' END                AS "نوع",
+    COUNT(*)       OVER (PARTITION BY noe_moshtary)                                 AS "تعداد مشتری",
+    MIN(tedad_aghlam) OVER (PARTITION BY noe_moshtary)                              AS "اقلام کمینه",
+    PERCENTILE_CONT(0.20) WITHIN GROUP (ORDER BY tedad_aghlam) OVER (PARTITION BY noe_moshtary) AS "اقلام ۲۰٪",
+    PERCENTILE_CONT(0.40) WITHIN GROUP (ORDER BY tedad_aghlam) OVER (PARTITION BY noe_moshtary) AS "اقلام ۴۰٪",
+    PERCENTILE_CONT(0.60) WITHIN GROUP (ORDER BY tedad_aghlam) OVER (PARTITION BY noe_moshtary) AS "اقلام ۶۰٪",
+    PERCENTILE_CONT(0.80) WITHIN GROUP (ORDER BY tedad_aghlam) OVER (PARTITION BY noe_moshtary) AS "اقلام ۸۰٪",
+    MAX(tedad_aghlam) OVER (PARTITION BY noe_moshtary)                              AS "اقلام بیشینه",
+    PERCENTILE_CONT(0.20) WITHIN GROUP (ORDER BY tedad_sku) OVER (PARTITION BY noe_moshtary) AS "SKU ۲۰٪",
+    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY tedad_sku) OVER (PARTITION BY noe_moshtary) AS "SKU ۵۰٪",
+    PERCENTILE_CONT(0.80) WITHIN GROUP (ORDER BY tedad_sku) OVER (PARTITION BY noe_moshtary) AS "SKU ۸۰٪"
+FROM kharid
+WHERE noe_moshtary IN (347, 348)
+```
+
+`PERCENTILE_CONT` پنجره‌ای است و برای هر سطر تکرار می‌شود؛ `DISTINCT` یک سطر
+به‌ازای هر نوع می‌دهد.
+
+بعد:
+
+```bash
+python scripts/rules.py set item_count.omde <۲۰٪> <۴۰٪> <۶۰٪> <۸۰٪>
+```
+
+سه نکته:
+
+- **عدد را گرد کن.** آستانه‌ی ۱۸٬۴۳۷ چیزی به دقت اضافه نمی‌کند و در جلسه قابل
+  دفاع نیست؛ ۱۸٬۰۰۰ همان کار را می‌کند.
+- **این کوئری فقط مشتریِ خریدکرده را می‌بیند.** اگر جمعیت واقعی شامل مشتریِ
+  بی‌خرید هم هست، صدک‌ها به بالا منحرف‌اند — کوئری ۲ را اول بساز.
+- **صدک، قاعده‌ی کسب‌وکار نیست.** خروجی را به مدیر فروش نشان بده و بگو با این
+  آستانه‌ها توزیع رتبه‌ها چه می‌شود. تصمیم اوست.

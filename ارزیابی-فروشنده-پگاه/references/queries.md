@@ -37,10 +37,13 @@ SELECT CAST('2026-08-22' AS date) AS rooz_arzyabi,   -- روز ارزیابی
 - مبنای معیار ۱ بین ۲۵ (روزانه) و ۲۸۰ (ماهانه) عوض می‌شود.
 - معیار ۴ و معیار ۶ در دوره‌ی روزانه محاسبه **نمی‌شوند** (`NULL` می‌مانند) —
   دوره‌ی روزانه چهار معیار دارد.
+- `marjoee` مرجوعیِ **مبنادار** را می‌آورد: اقلامی که علتشان مسئولیتِ «فروش»
+  دارد (`Warehouse.ElatMarjoeeKala.MasoleiatElat = 1`). خرابی، ضایعات تولید و
+  آسیب انبار مسئولیتِ تولید و پخش‌اند و در این عدد نیستند. مخرجش `tedad_forosh`
+  است، پس نسبت **کالا ÷ کالا** است نه فاکتور ÷ فاکتور.
 - حذفِ مرجوعی بالای ۲٪ فقط در دوره‌ی «تا روز» اعمال می‌شود.
 - `hadeaghal_faktor` فروشنده‌هایی را که در بازه یکی‌دو فاکتور دارند کنار
-  می‌گذارد؛ بدون آن، کسی که یک فاکتور و همان یکی مرجوعی داشته ۱۰۰٪ مرجوعی
-  می‌گیرد و جدول را خراب می‌کند.
+  می‌گذارد.
 
 ```sql
 WITH params AS (
@@ -77,13 +80,22 @@ shop AS (
 ),
 faktor AS (
     SELECT a.ccForoshandeh,
-           COUNT(DISTINCT a.ccDarkhastFaktor)                                        AS kol_faktor,
-           COUNT(DISTINCT CASE WHEN a.IsMarjoee=1 THEN a.ccDarkhastFaktor END)        AS faktor_marjoee,
-           COUNT(DISTINCT CASE WHEN a.IsMarjoee=0 THEN a.ccDarkhastFaktor END)        AS faktor_forosh
+           COUNT(DISTINCT a.ccDarkhastFaktor) AS kol_faktor,
+           SUM(a.Tedad)                       AS tedad_forosh
     FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
-    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to
+    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
       AND (b.sazman_forosh IS NULL OR a.ccSazmanForosh = b.sazman_forosh)
     GROUP BY a.ccForoshandeh
+),
+marjoee AS (
+    SELECT h.ccForoshandeh, SUM(CAST(s.Tedad1 AS bigint)) AS tedad_marjoee
+    FROM Sales.ElamMarjoee h
+    JOIN Sales.ElamMarjoeeSatr s ON s.ccElamMarjoee = h.ccElamMarjoee
+    JOIN Warehouse.ElatMarjoeeKala e ON e.ccElatMarjoeeKala = s.ccElatMarjoeeKala
+    CROSS JOIN bazeh b
+    WHERE h.TarikhElamMarjoee >= b.d_from AND h.TarikhElamMarjoee < b.d_to
+      AND e.MasoleiatElat = 1
+    GROUP BY h.ccForoshandeh
 ),
 satr AS (
     SELECT d.ccForoshandeh, COUNT(*) AS tedad_satr
@@ -138,16 +150,18 @@ calc AS (
     SELECT f.ccForoshandeh, b.d_from, b.d_to, b.mahaneh, b.sazman_forosh, tv.rooz_kari,
            LTRIM(RTRIM(ISNULL(p.FName, '') + ' ' + ISNULL(p.LName, ''))) AS person,
            n.n_people, sh.tedad_ba_zarib, fk.kol_faktor,
+           fk.tedad_forosh, ISNULL(mj.tedad_marjoee, 0) AS tedad_marjoee,
            100.0 * v.vizit_mosbat   / NULLIF(v.vizit_rafteh, 0)    AS vizit_pct,
-           1.0   * s.tedad_satr     / NULLIF(fk.faktor_forosh, 0)  AS satr_per_faktor,
+           1.0   * s.tedad_satr     / NULLIF(fk.kol_faktor, 0)     AS satr_per_faktor,
            100.0 * v.moshtary_kharid / NULLIF(v.moshtary_rafteh, 0) AS moshtary_pct,
-           100.0 * fk.faktor_marjoee / NULLIF(fk.kol_faktor, 0)     AS marjoee_pct,
+           100.0 * ISNULL(mj.tedad_marjoee, 0) / NULLIF(fk.tedad_forosh, 0) AS marjoee_pct,
            gr.tahaghogh_pct, gr.s_target, gr.n_goroh
     FROM Sales.Foroshandeh f
     CROSS JOIN bazeh b
     CROSS JOIN taghvim tv
     JOIN faktor fk        ON fk.ccForoshandeh = f.ccForoshandeh
     JOIN shop sh          ON sh.ccForoshandeh = f.ccForoshandeh
+    LEFT JOIN marjoee mj  ON mj.ccForoshandeh = f.ccForoshandeh
     LEFT JOIN satr s      ON s.ccForoshandeh = f.ccForoshandeh
     LEFT JOIN vis  v      ON v.ccForoshandeh = f.ccForoshandeh
     LEFT JOIN goroh gr    ON gr.ccForoshandeh = f.ccForoshandeh
@@ -196,7 +210,9 @@ SELECT ROW_NUMBER() OVER (ORDER BY hazf, jam_emtiaz DESC)       AS "رتبه",
        CAST(vizit_pct AS decimal(6,2))       AS "درصد ویزیت مثبت",
        CAST(satr_per_faktor AS decimal(6,2)) AS "میانگین سطر فاکتور",
        CAST(moshtary_pct AS decimal(6,2))    AS "درصد مشتری خرید کرده",
-       CAST(marjoee_pct AS decimal(6,2))     AS "درصد فاکتور مرجوعی",
+       tedad_marjoee  AS "تعداد مرجوعی فروش",
+       tedad_forosh   AS "تعداد فروش",
+       CAST(marjoee_pct AS decimal(6,3))     AS "درصد مرجوعی مبنادار",
        CAST(tahaghogh_pct AS decimal(8,2))   AS "تحقق هدف گروه",
        n_goroh AS "تعداد گروه",
        CAST(d_from AS date) AS "از", CAST(DATEADD(day,-1,d_to) AS date) AS "تا",
@@ -220,6 +236,9 @@ CASE WHEN mahaneh = 1 THEN (moshtary_pct - 80) * 0.5 END AS s_moshtary
 (1 - marjoee_pct) / 0.25                              AS s_marjoee
 ```
 
+و خودِ `marjoee_pct` در CTE `calc`:
+`100.0 * ISNULL(mj.tedad_marjoee, 0) / NULLIF(fk.tedad_forosh, 0)`.
+
 و معیار ۶ در CTE `goroh`: `100.0 * SUM(forosh) / SUM(hadaf) - 75`.
 
 باندهای وضعیت هم در `SELECT` نهایی‌اند: بالای صفر «عالی»، تا ۵− «معمولی»،
@@ -227,13 +246,27 @@ CASE WHEN mahaneh = 1 THEN (moshtary_pct - 80) * 0.5 END AS s_moshtary
 
 ## ۳. ورودی برای `score.py`
 
-اگر ارزیابی کامل با اسکریپت می‌خواهی، همین کوئری را با ستون‌های خام بگیر
-(`tedad_ba_zarib`، `vizit_rafteh`، `vizit_mosbat`، `tedad_satr`،
-`faktor_forosh`، `moshtary_rafteh`، `moshtary_kharid`، `kol_faktor`،
-`faktor_marjoee`) و کلیدهای `score.py` را با آن‌ها پر کن:
-`weighted_shops`، `visits_total`، `visits_positive`، `invoice_line_count`،
-`invoice_count`، `customers_assigned`، `customers_purchased`،
-`returned_invoices`، و `product_groups`.
+اگر ارزیابی کامل با اسکریپت می‌خواهی، همین کوئری را با ستون‌های خام بگیر و
+کلیدهای `score.py` را از این جدول پر کن. معیار ۳ روی فاکتور
+است و معیار ۵ روی کالا، پس مخرجشان یکی نیست.
+
+| ستون کوئری | کلید `score.py` |
+|---|---|
+| `tedad_ba_zarib` | `weighted_shops` |
+| `vizit_rafteh` | `visits_total` |
+| `vizit_mosbat` | `visits_positive` |
+| `tedad_satr` | `invoice_line_count` |
+| `moshtary_rafteh` | `customers_assigned` |
+| `moshtary_kharid` | `customers_purchased` |
+| `kol_faktor` | `invoice_count` |
+| `tedad_marjoee` | `returns_qty` |
+| `tedad_forosh` | `sold_qty` |
+| گروه‌های هدف | `product_groups` |
+
+`returns_qty` را **حتی وقتی صفر است** بفرست — و در مرداد ۱۴۰۵ برای ۱۲ فروشنده
+صفر بود. اگر کلید را جا بیندازی، اسکریپت آن را «بدون داده» می‌گیرد و از جمع
+کنار می‌گذارد؛ یعنی فروشنده‌ای که هیچ مرجوعی ندارد به‌جای ۴+ نمره صفر می‌گیرد
+و «۵ از ۶» می‌خورد.
 
 ```python
 import subprocess, sys
@@ -260,13 +293,42 @@ print(r.stdout or r.stderr)
 اگر مدیر فروش اصرار داشت در ارزیابی روزانه هم باشد، تنها شکل معقولش مقایسه‌ی
 **ماه تا امروز** است، نه فروشِ همان یک روز.
 
+## ۴. چرا مرجوعی از `AmarForosh_Arshive` درنمی‌آید
+
+این را روی داده زدیم و جواب قطعی است، دوباره نگرد:
+
+```sql
+SELECT IsMarjoee, COUNT(*) AS radif, COUNT(DISTINCT ccDarkhastFaktor) AS asnad
+FROM Sales.AmarForosh_Arshive
+WHERE Tarikh >= '2026-07-23' AND Tarikh < '2026-08-23'
+GROUP BY IsMarjoee
+```
+
+مرداد ۱۴۰۵: `IsMarjoee=0` ⇒ ۲۲۷٬۷۰۵ سطر روی ۲۸٬۱۸۴ فاکتور. `IsMarjoee=1` ⇒
+۶٬۳۴۷ سطر روی **یک** «سند» — چون `ccDarkhastFaktor` روی سطر مرجوعی `NULL` است.
+هیچ فاکتوری هم‌زمان سطر فروش و سطر مرجوعی ندارد.
+
+نتیجه‌ها:
+
+- **هر شمارشِ «تعداد فاکتور مرجوعی» از این جدول عدد جعلی می‌دهد** — برای هر
+  فروشنده یک، چون همه‌ی سطرهایش یک کلید `NULL` دارند.
+- **علتِ مرجوعی هم در این جدول نیست**، پس مبنادار از غیرمبنادار جدا نمی‌شود.
+- `Tedad` سطر مرجوعی از قبل **منفی** است. اگر جایی خودت منفی‌اش کنی، دو بار
+  منفی می‌شود.
+
+برای همین معیار ۵ از `Sales.ElamMarjoee` می‌آید. جزئیات در
+[metrics.md](metrics.md#۵-درصد-مرجوعی-مبنادار-ویزیتور).
+
 ## اندازه‌ها، برای اینکه بفهمی جواب معقول است
 
-مرداد ۱۴۰۵ با فیلتر درخواست‌گیر و کف ۵ فاکتور: **۱۰۹ فروشنده**، ۲۳ روز کاری،
-۳ حذف‌شده. روزانه: ۸۷ فروشنده.
+مرداد ۱۴۰۵ (۲۰۲۶-۰۷-۲۳ تا ۲۰۲۶-۰۸-۲۲) با فیلتر درخواست‌گیر و کف ۵ فاکتور —
+از اجرای واقعی همین کوئری: **۱۰۸ فروشنده**، ۲۳ روز کاری، **صفر حذف‌شده**.
 
-- میانگین ویزیت مثبت ۳۹.۷٪ در برابر مبنای ۴۰٪
-- میانگین تحقق هدف ۷۰٪ در برابر مبنای ۷۵٪
-- ۱۰۷ از ۱۲۰ فروشنده مرجوعی زیر ۱٪
+- میانگین ویزیت مثبت ۴۰.۲٪ در برابر مبنای ۴۰٪
+- میانگین سطر هر فاکتور ۶.۸ در برابر مبنای ۶
+- میانگین تحقق هدف ۷۳.۴٪ در برابر مبنای ۷۵٪
+- میانگین مرجوعی مبنادار ۰.۴۴٪ در برابر مبنای ۱٪؛ بیشترین ۱.۷۸٪، و ۱۰۰ از ۱۰۸
+  زیر ۱٪
+- میانگین جمع امتیاز ۱۶.۴−
 
 اگر هر کدام از این‌ها خیلی دور از مبنا درآمد، جایی از کوئری عوض شده.

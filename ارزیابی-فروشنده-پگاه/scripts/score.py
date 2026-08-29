@@ -45,12 +45,12 @@ def measure(key, person, rules):
     if key == "purchasing_customer_pct":
         return ratio(person.get("customers_purchased"), person.get("customers_assigned"))
     if key == "return_pct":
-        basis = rules.get("return_basis", "invoice_count")
-        if basis == "invoice_count":
-            return ratio(person.get("returned_invoices"), person.get("invoice_count"))
+        basis = rules.get("return_basis", "quantity")
         if basis == "quantity":
             return ratio(person.get("returns_qty"), person.get("sold_qty"))
-        return ratio(person.get("returns_amount"), person.get("gross_sales_amount"))
+        if basis == "amount":
+            return ratio(person.get("returns_amount"), person.get("gross_sales_amount"))
+        raise SystemExit(f"return_basis '{basis}' تعریف نشده. مجاز: quantity، amount.")
     return None
 
 
@@ -163,6 +163,8 @@ def band(total, rules):
 def number(value):
     if value is None:
         return "—"
+    if value == 0:
+        return "0"
     return f"{value:g}"
 
 
@@ -207,11 +209,12 @@ def render(report):
         for row in result["criteria"]:
             if not row["groups"]:
                 continue
-            lines += ["", "گروه‌های محصول:", "", "| گروه | تحقق هدف | نمره |", "|---|---:|---:|"]
+            lines += ["", "گروه‌های محصول:", "",
+                      "| گروه | فروش | هدف | تحقق هدف |", "|---|---:|---:|---:|"]
             for group in row["groups"]:
                 lines.append(
-                    f"| {group['name']} | {number(group['achievement_pct'])} ٪ | "
-                    f"{number(group['score'])} |"
+                    f"| {group['name']} | {number(group['sales'])} | "
+                    f"{number(group['target'])} | {number(group['achievement_pct'])} ٪ |"
                 )
 
         if result["knockout"]:

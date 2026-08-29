@@ -1,5 +1,5 @@
 {
-  "version": "1405-06-05",
+  "version": "1405-06-08",
   "stepping": "continuous",
   "bands": [
     {
@@ -28,7 +28,7 @@
     "omde": 348,
     "chain": 350
   },
-  "return_basis": "invoice_count",
+  "return_basis": "quantity",
   "min_invoices": 5,
   "periods": {
     "daily": {
@@ -63,7 +63,7 @@
         },
         {
           "key": "return_pct",
-          "label": "درصد فاکتور مرجوعی",
+          "label": "درصد مرجوعی مبنادار (فروش)",
           "unit": "٪",
           "baseline": 1,
           "step": 0.25,
@@ -113,14 +113,14 @@
         },
         {
           "key": "return_pct",
-          "label": "درصد فاکتور مرجوعی",
+          "label": "درصد مرجوعی مبنادار (فروش)",
           "unit": "٪",
           "baseline": 1,
           "step": 0.25,
           "points_per_step": 1,
           "direction": "lower_is_better",
           "zero_total_above": 2,
-          "zero_total_note": "مرجوعی بیش از ۲٪ — نمره کل ارزیابی صفر است."
+          "zero_total_note": "مرجوعی مبنادار بیش از ۲٪ — نمره کل ارزیابی صفر است."
         },
         {
           "key": "target_achievement_pct",
