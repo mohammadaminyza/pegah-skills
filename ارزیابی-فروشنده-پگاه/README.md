@@ -26,7 +26,7 @@ examples/sample-input.json    نمونه ورودی کامل
 | ۵ درصد فاکتور مرجوعی | `AmarForosh_Arshive` — فاکتور مرجوعی‌دار ÷ کل فاکتور |
 | ۶ درصد تحقق کل هدف | `Sales.HadafForoshRoozanehNew` (فقط ماهانه) |
 | تقویم | `Global.Taghvim` (`CodeNoeTatili IS NULL`) |
-| گروه محصول | `Global.vGorohMahsol` با `ccGorohLink = 560` |
+| گروه محصول | `Global.Goroh` با `ccGorohLink = 560` |
 | لاین فروش | `Global.SazmanForosh` |
 | نام فروشنده | `Global.Afrad` از `ccAfradForoshandeh` |
 

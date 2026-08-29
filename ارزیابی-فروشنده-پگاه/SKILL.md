@@ -16,7 +16,8 @@ description: محاسبه نمره ارزیابی فروشنده پگاه از �
 
 > **هدف گروه محصول از `Sales.HadafForoshRoozanehNew` می‌آید** — روزانه، به
 > تفکیک فروشنده × گروه کالا، و هدف و عملکرد را با هم دارد. نام گروه‌ها از
-> `Global.vGorohMahsol` با `ccGorohLink = 560`.
+> `Global.Goroh` با `ccGorohLink = 560` — نه `vGorohMahsol` که ۲۲ گروه از ۵۵
+> گروه را ندارد.
 
 > **سه جدول را باز نکن.** `Sales.AmalkardRozanehForosh` و `Sales.HadafForosh`
 > (هر دو تا ۲۰۱۸) مرده‌اند و اسمشان دقیقاً همین کار است.
