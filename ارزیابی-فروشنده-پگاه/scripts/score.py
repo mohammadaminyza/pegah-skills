@@ -19,17 +19,21 @@ def ratio(numerator, denominator, scale=100.0):
 
 
 def weighted_shops(person, rules):
+    """جمع مغازه‌روزها با ضریب نوع مشتری. کلید shops یا key است یا code."""
     shops = person.get("shops")
     if not shops:
         return None
-    weights = rules["shop_weights"]
-    unknown = sorted(key for key in shops if key not in weights)
+    types = {}
+    for shop_type in rules["shop_types"]:
+        types[shop_type["key"]] = shop_type["weight"]
+        types[str(shop_type["code"])] = shop_type["weight"]
+    unknown = sorted(key for key in shops if str(key) not in types)
     if unknown:
-        known = ", ".join(weights)
+        known = ", ".join(t["key"] for t in rules["shop_types"])
         raise SystemExit(
             f"نوع مشتری ناشناخته در shops: {', '.join(unknown)}. نوع‌های تعریف‌شده: {known}."
         )
-    return float(sum(weights[key] * (shops[key] or 0) for key in shops))
+    return float(sum(types[str(key)] * (shops[key] or 0) for key in shops))
 
 
 def measure(key, person, rules):

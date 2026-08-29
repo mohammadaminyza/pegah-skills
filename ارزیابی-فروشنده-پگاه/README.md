@@ -19,7 +19,7 @@ examples/sample-input.json    نمونه ورودی کامل
 
 | معیار | منبع |
 |---|---|
-| ۱ تعداد مغازه با ضریب | `Sales.AmarForosh_Arshive` (`ccNoeMoshtary` ۳۴۷/۳۴۸/۳۵۰) |
+| ۱ واحد مغازه‌روز با ضریب | `Sales.AmarForosh_Arshive` + ضریب از `Sales.ZaribNoeMoshtary` |
 | ۲ درصد ویزیت مثبت | `Sales.VisitForoshandeh_Arshiv` — رویدادِ ویزیت |
 | ۳ میانگین سطر هر فاکتور | `Sales.DarkhastFaktorSatr` — `COUNT(*)` |
 | ۴ درصد مشتری خرید کرده | `VisitForoshandeh_Arshiv` — مشتریِ متمایز (فقط ماهانه) |

@@ -34,7 +34,10 @@ SELECT CAST('2026-08-22' AS date) AS rooz_arzyabi,   -- روز ارزیابی
 - `bazeh` برای «تا روز» یک ماه متحرک می‌سازد که به روز ارزیابی ختم می‌شود
   (`DATEADD(month, -1, ...)`) — سرتیتر برگه می‌گوید «هر روز تا یک ماه قبلی».
 - `taghvim` روز کاری را از `Global.Taghvim` می‌شمارد (`CodeNoeTatili IS NULL`).
-- مبنای معیار ۱ بین ۲۵ (روزانه) و ۲۸۰ (ماهانه) عوض می‌شود.
+- معیار ۱ **مغازه‌روز** می‌شمارد نه مغازه: مشتریانِ متمایزِ هر روز، ضریب‌خورده،
+  بعد جمعِ روزها. یک مغازه که در ماه ۳ بار فاکتور خورده ۳ مغازه‌روز است. ستون‌های
+  «مغازه یکتا» تعداد واقعی مغازه را جدا نشان می‌دهند. مبنا بین ۲۵ (روزانه) و
+  ۲۸۰ (ماهانه) عوض می‌شود.
 - معیار ۴ و معیار ۶ در دوره‌ی روزانه محاسبه **نمی‌شوند** (`NULL` می‌مانند) —
   دوره‌ی روزانه چهار معیار دارد.
 - `marjoee` مرجوعیِ **مبنادار** را می‌آورد: اقلامی که علتشان مسئولیتِ «فروش»
@@ -47,18 +50,40 @@ SELECT CAST('2026-08-22' AS date) AS rooz_arzyabi,   -- روز ارزیابی
 
 ```sql
 WITH params AS (
-    SELECT CAST('2026-08-22' AS date) AS rooz_arzyabi,
-           1                          AS mahaneh,
-           5                          AS hadeaghal_faktor,
-           CAST(NULL AS int)          AS sazman_forosh
+    SELECT
+        CAST('2026-08-22' AS date) AS rooz_arzyabi,
+        1                          AS mahaneh,            -- ۱ = تا روز، ۰ = فقط همان روز
+        5                          AS hadeaghal_faktor,
+        CAST(NULL AS int)          AS sazman_forosh,      -- NULL = همه لاین‌ها
+        1                          AS cc_noe_foroshandeh, -- ۱ = درخواست‌گیر
+        347                        AS cc_khord,
+        348                        AS cc_omde,
+        350                        AS cc_zanjireh,
+        CAST(0.0 AS float)         AS zarib_pishfarz,     -- نوعی که در جدول ضرایب نیست
+        1                          AS masoleiat_marjoee,  -- ۱ فروش، ۲ پخش، ۳ تولید، ۴ هردو
+        25.0  AS mabna_magazeh_rooz, 1.0  AS gam_magazeh_rooz,
+        280.0 AS mabna_magazeh_mah,  5.0  AS gam_magazeh_mah,  1.0 AS nomre_magazeh,
+        40.0  AS mabna_vizit,        1.0  AS gam_vizit,        0.5 AS nomre_vizit,
+        6.0   AS mabna_satr,         1.0  AS gam_satr,         0.5 AS nomre_satr,
+        80.0  AS mabna_moshtary,     1.0  AS gam_moshtary,     0.5 AS nomre_moshtary,
+        1.0   AS mabna_marjoee,      0.25 AS gam_marjoee,      1.0 AS nomre_marjoee,
+        75.0  AS mabna_hadaf,        1.0  AS gam_hadaf,        1.0 AS nomre_hadaf,
+        2.0   AS hazf_marjoee_bala,
+        0.0   AS band_ali,           -5.0 AS band_maamouli
 ),
 bazeh AS (
-    SELECT CASE WHEN p.mahaneh = 1
+    SELECT p.*,
+           CASE WHEN p.mahaneh = 1
                 THEN DATEADD(day, 1, DATEADD(month, -1, CAST(p.rooz_arzyabi AS datetime)))
                 ELSE CAST(p.rooz_arzyabi AS datetime) END AS d_from,
-           DATEADD(day, 1, CAST(p.rooz_arzyabi AS datetime)) AS d_to,
-           p.rooz_arzyabi, p.mahaneh, p.hadeaghal_faktor, p.sazman_forosh
+           DATEADD(day, 1, CAST(p.rooz_arzyabi AS datetime)) AS d_to
     FROM params p
+),
+zarib AS (
+    -- ضریب نوع مشتری از خودِ سیستم. برای ضریب دستی، این را با یک VALUES عوض کن:
+    -- SELECT * FROM (VALUES (347,1.0),(348,2.0),(349,1.5),(350,4.0)) v(ccNoeMoshtary, zarib)
+    SELECT z.ccNoeMoshtary, CAST(z.Zarib AS float) AS zarib
+    FROM Sales.ZaribNoeMoshtary z
 ),
 taghvim AS (
     SELECT COUNT(*) AS rooz_kari
@@ -66,22 +91,35 @@ taghvim AS (
     WHERE g.Tarikh >= b.d_from AND g.Tarikh < b.d_to AND g.CodeNoeTatili IS NULL
 ),
 rooz AS (
-    SELECT a.ccForoshandeh, a.Tarikh,
-           COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary=347 THEN a.ccMoshtary END) * 1
-         + COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary=348 THEN a.ccMoshtary END) * 3
-         + COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary=350 THEN a.ccMoshtary END) * 5 AS zarib_rooz
+    SELECT a.ccForoshandeh, a.Tarikh, a.ccNoeMoshtary,
+           COUNT(DISTINCT a.ccMoshtary) AS magazeh
     FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
     WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
       AND (b.sazman_forosh IS NULL OR a.ccSazmanForosh = b.sazman_forosh)
-    GROUP BY a.ccForoshandeh, a.Tarikh
+    GROUP BY a.ccForoshandeh, a.Tarikh, a.ccNoeMoshtary
 ),
 shop AS (
-    SELECT ccForoshandeh, SUM(zarib_rooz) AS tedad_ba_zarib FROM rooz GROUP BY ccForoshandeh
+    SELECT r.ccForoshandeh,
+           SUM(CASE WHEN r.ccNoeMoshtary = b.cc_khord    THEN r.magazeh ELSE 0 END) AS mr_khord,
+           SUM(CASE WHEN r.ccNoeMoshtary = b.cc_omde     THEN r.magazeh ELSE 0 END) AS mr_omde,
+           SUM(CASE WHEN r.ccNoeMoshtary = b.cc_zanjireh THEN r.magazeh ELSE 0 END) AS mr_zanjireh,
+           SUM(CASE WHEN r.ccNoeMoshtary NOT IN (b.cc_khord, b.cc_omde, b.cc_zanjireh)
+                    THEN r.magazeh ELSE 0 END)                                      AS mr_digar,
+           SUM(CASE WHEN z.zarib IS NULL THEN r.magazeh ELSE 0 END)                 AS mr_bi_zarib,
+           SUM(r.magazeh)                                                           AS mr_kol,
+           SUM(r.magazeh * ISNULL(z.zarib, b.zarib_pishfarz))                       AS vahed_ba_zarib
+    FROM rooz r CROSS JOIN bazeh b
+    LEFT JOIN zarib z ON z.ccNoeMoshtary = r.ccNoeMoshtary
+    GROUP BY r.ccForoshandeh
 ),
-faktor AS (
+forosh AS (
     SELECT a.ccForoshandeh,
-           COUNT(DISTINCT a.ccDarkhastFaktor) AS kol_faktor,
-           SUM(a.Tedad)                       AS tedad_forosh
+           COUNT(DISTINCT a.ccDarkhastFaktor)  AS kol_faktor,
+           SUM(a.Tedad)                        AS tedad_forosh,
+           COUNT(DISTINCT a.ccMoshtary)        AS magazeh_yekta,
+           COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary = b.cc_khord    THEN a.ccMoshtary END) AS khord_yekta,
+           COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary = b.cc_omde     THEN a.ccMoshtary END) AS omde_yekta,
+           COUNT(DISTINCT CASE WHEN a.ccNoeMoshtary = b.cc_zanjireh THEN a.ccMoshtary END) AS zanjireh_yekta
     FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
     WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
       AND (b.sazman_forosh IS NULL OR a.ccSazmanForosh = b.sazman_forosh)
@@ -94,7 +132,7 @@ marjoee AS (
     JOIN Warehouse.ElatMarjoeeKala e ON e.ccElatMarjoeeKala = s.ccElatMarjoeeKala
     CROSS JOIN bazeh b
     WHERE h.TarikhElamMarjoee >= b.d_from AND h.TarikhElamMarjoee < b.d_to
-      AND e.MasoleiatElat = 1
+      AND e.MasoleiatElat = b.masoleiat_marjoee
     GROUP BY h.ccForoshandeh
 ),
 satr AS (
@@ -107,59 +145,70 @@ satr AS (
 ),
 vis AS (
     SELECT v.ccForoshandeh,
-           SUM(v.MorajehShodeh)                                            AS vizit_rafteh,
-           SUM(v.VisitMosbat)                                              AS vizit_mosbat,
+           SUM(v.MorajehShodeh)                                              AS vizit_rafteh,
+           SUM(v.VisitMosbat)                                                AS vizit_mosbat,
            COUNT(DISTINCT CASE WHEN v.MorajehShodeh=1 THEN v.ccMoshtary END) AS moshtary_rafteh,
-           COUNT(DISTINCT CASE WHEN v.VisitMosbat=1  THEN v.ccMoshtary END) AS moshtary_kharid
+           COUNT(DISTINCT CASE WHEN v.VisitMosbat=1   THEN v.ccMoshtary END) AS moshtary_kharid,
+           COUNT(DISTINCT CASE WHEN v.MorajehShodeh=1 AND m.ccNoeMoshtary = b.cc_khord
+                               THEN v.ccMoshtary END)                        AS vizit_khord,
+           COUNT(DISTINCT CASE WHEN v.MorajehShodeh=1 AND m.ccNoeMoshtary = b.cc_omde
+                               THEN v.ccMoshtary END)                        AS vizit_omde,
+           COUNT(DISTINCT CASE WHEN v.MorajehShodeh=1 AND m.ccNoeMoshtary = b.cc_zanjireh
+                               THEN v.ccMoshtary END)                        AS vizit_zanjireh
     FROM Sales.VisitForoshandeh_Arshiv v CROSS JOIN bazeh b
+    LEFT JOIN Sales.vMoshtary m ON m.ccMoshtary = v.ccMoshtary
     WHERE v.TarikhVisit >= b.d_from AND v.TarikhVisit < b.d_to AND v.IsTatil = 0
       AND (b.sazman_forosh IS NULL OR v.ccSazmanForosh = b.sazman_forosh)
     GROUP BY v.ccForoshandeh
 ),
-goroh_hadaf AS (
-    SELECT h.ccForoshandeh, h.ccGorohKala,
-           SUM(h.TedadHadaf)  AS hadaf,
-           SUM(h.TedadForosh) AS forosh
-    FROM Sales.HadafForoshRoozanehNew h CROSS JOIN bazeh b
-    WHERE h.Tarikh >= b.d_from AND h.Tarikh < b.d_to
-      AND (b.sazman_forosh IS NULL OR h.ccSazmanForosh = b.sazman_forosh)
-    GROUP BY h.ccForoshandeh, h.ccGorohKala
-    HAVING SUM(h.TedadHadaf) > 0
-),
 goroh AS (
     SELECT ccForoshandeh,
-           100.0 * SUM(forosh) / NULLIF(SUM(hadaf), 0)        AS tahaghogh_pct,
-           100.0 * SUM(forosh) / NULLIF(SUM(hadaf), 0) - 75   AS s_target,
-           COUNT(*)                                           AS n_goroh
-    FROM goroh_hadaf GROUP BY ccForoshandeh
-),
-nafar AS (
-    SELECT a.ccForoshandeh, a.ccAfradForoshandeh, SUM(a.Rial) AS rial
-    FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
-    WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
-      AND (b.sazman_forosh IS NULL OR a.ccSazmanForosh = b.sazman_forosh)
-    GROUP BY a.ccForoshandeh, a.ccAfradForoshandeh
+           100.0 * SUM(forosh) / NULLIF(SUM(hadaf), 0) AS tahaghogh_pct,
+           COUNT(*)                                    AS n_goroh
+    FROM (
+        SELECT h.ccForoshandeh, h.ccGorohKala,
+               SUM(h.TedadHadaf)  AS hadaf,
+               SUM(h.TedadForosh) AS forosh
+        FROM Sales.HadafForoshRoozanehNew h CROSS JOIN bazeh b
+        WHERE h.Tarikh >= b.d_from AND h.Tarikh < b.d_to
+          AND (b.sazman_forosh IS NULL OR h.ccSazmanForosh = b.sazman_forosh)
+        GROUP BY h.ccForoshandeh, h.ccGorohKala
+        HAVING SUM(h.TedadHadaf) > 0
+    ) gh
+    GROUP BY ccForoshandeh
 ),
 asli AS (
     SELECT ccForoshandeh, ccAfradForoshandeh,
            ROW_NUMBER() OVER (PARTITION BY ccForoshandeh ORDER BY rial DESC) AS rn,
            COUNT(*)    OVER (PARTITION BY ccForoshandeh)                     AS n_people
-    FROM nafar
+    FROM (
+        SELECT a.ccForoshandeh, a.ccAfradForoshandeh, SUM(a.Rial) AS rial
+        FROM Sales.AmarForosh_Arshive a CROSS JOIN bazeh b
+        WHERE a.Tarikh >= b.d_from AND a.Tarikh < b.d_to AND a.IsMarjoee = 0
+          AND (b.sazman_forosh IS NULL OR a.ccSazmanForosh = b.sazman_forosh)
+        GROUP BY a.ccForoshandeh, a.ccAfradForoshandeh
+    ) nafar
 ),
 calc AS (
     SELECT f.ccForoshandeh, b.d_from, b.d_to, b.mahaneh, b.sazman_forosh, tv.rooz_kari,
            LTRIM(RTRIM(ISNULL(p.FName, '') + ' ' + ISNULL(p.LName, ''))) AS person,
-           n.n_people, sh.tedad_ba_zarib, fk.kol_faktor,
-           fk.tedad_forosh, ISNULL(mj.tedad_marjoee, 0) AS tedad_marjoee,
-           100.0 * v.vizit_mosbat   / NULLIF(v.vizit_rafteh, 0)    AS vizit_pct,
-           1.0   * s.tedad_satr     / NULLIF(fk.kol_faktor, 0)     AS satr_per_faktor,
-           100.0 * v.moshtary_kharid / NULLIF(v.moshtary_rafteh, 0) AS moshtary_pct,
-           100.0 * ISNULL(mj.tedad_marjoee, 0) / NULLIF(fk.tedad_forosh, 0) AS marjoee_pct,
-           gr.tahaghogh_pct, gr.s_target, gr.n_goroh
+           n.n_people,
+           fr.kol_faktor, fr.tedad_forosh, fr.magazeh_yekta,
+           fr.khord_yekta, fr.omde_yekta, fr.zanjireh_yekta,
+           sh.mr_khord, sh.mr_omde, sh.mr_zanjireh, sh.mr_digar, sh.mr_bi_zarib,
+           sh.mr_kol, sh.vahed_ba_zarib,
+           v.vizit_rafteh, v.vizit_mosbat, v.moshtary_rafteh, v.moshtary_kharid,
+           v.vizit_khord, v.vizit_omde, v.vizit_zanjireh,
+           ISNULL(mj.tedad_marjoee, 0) AS tedad_marjoee,
+           100.0 * v.vizit_mosbat    / NULLIF(v.vizit_rafteh, 0)     AS vizit_pct,
+           1.0   * s.tedad_satr      / NULLIF(fr.kol_faktor, 0)      AS satr_per_faktor,
+           100.0 * v.moshtary_kharid / NULLIF(v.moshtary_rafteh, 0)  AS moshtary_pct,
+           100.0 * ISNULL(mj.tedad_marjoee, 0) / NULLIF(fr.tedad_forosh, 0) AS marjoee_pct,
+           gr.tahaghogh_pct, gr.n_goroh
     FROM Sales.Foroshandeh f
     CROSS JOIN bazeh b
     CROSS JOIN taghvim tv
-    JOIN faktor fk        ON fk.ccForoshandeh = f.ccForoshandeh
+    JOIN forosh fr        ON fr.ccForoshandeh = f.ccForoshandeh
     JOIN shop sh          ON sh.ccForoshandeh = f.ccForoshandeh
     LEFT JOIN marjoee mj  ON mj.ccForoshandeh = f.ccForoshandeh
     LEFT JOIN satr s      ON s.ccForoshandeh = f.ccForoshandeh
@@ -167,59 +216,81 @@ calc AS (
     LEFT JOIN goroh gr    ON gr.ccForoshandeh = f.ccForoshandeh
     LEFT JOIN asli n      ON n.ccForoshandeh = f.ccForoshandeh AND n.rn = 1
     LEFT JOIN Global.Afrad p ON p.ccAfrad = n.ccAfradForoshandeh
-    WHERE f.ccNoeForoshandeh = 1
-      AND fk.kol_faktor >= b.hadeaghal_faktor
+    WHERE f.ccNoeForoshandeh = b.cc_noe_foroshandeh
+      AND fr.kol_faktor >= b.hadeaghal_faktor
 ),
 emtiaz AS (
-    SELECT calc.*,
-           (tedad_ba_zarib - CASE WHEN mahaneh = 1 THEN 280 ELSE 25 END)
-             / CASE WHEN mahaneh = 1 THEN 5.0 ELSE 1.0 END       AS s_shop,
-           (vizit_pct - 40) * 0.5                                AS s_vizit,
-           (satr_per_faktor - 6) * 0.5                           AS s_satr,
-           CASE WHEN mahaneh = 1 THEN (moshtary_pct - 80) * 0.5 END AS s_moshtary,
-           (1 - marjoee_pct) / 0.25                              AS s_marjoee,
-           CASE WHEN mahaneh = 1 THEN s_target END                  AS s_hadaf
-    FROM calc
+    SELECT c.*,
+           (c.vahed_ba_zarib - CASE WHEN c.mahaneh = 1 THEN b.mabna_magazeh_mah ELSE b.mabna_magazeh_rooz END)
+             / CASE WHEN c.mahaneh = 1 THEN b.gam_magazeh_mah ELSE b.gam_magazeh_rooz END
+             * b.nomre_magazeh                                                       AS s_shop,
+           (c.vizit_pct - b.mabna_vizit) / b.gam_vizit * b.nomre_vizit                AS s_vizit,
+           (c.satr_per_faktor - b.mabna_satr) / b.gam_satr * b.nomre_satr             AS s_satr,
+           CASE WHEN c.mahaneh = 1 THEN
+                (c.moshtary_pct - b.mabna_moshtary) / b.gam_moshtary * b.nomre_moshtary END AS s_moshtary,
+           (b.mabna_marjoee - c.marjoee_pct) / b.gam_marjoee * b.nomre_marjoee        AS s_marjoee,
+           CASE WHEN c.mahaneh = 1 THEN
+                (c.tahaghogh_pct - b.mabna_hadaf) / b.gam_hadaf * b.nomre_hadaf END   AS s_hadaf
+    FROM calc c CROSS JOIN bazeh b
 ),
 jam AS (
-    SELECT emtiaz.*,
-           CASE WHEN mahaneh = 1 AND marjoee_pct > 2 THEN 0 ELSE
-                ISNULL(s_shop,0)+ISNULL(s_vizit,0)+ISNULL(s_satr,0)
-               +ISNULL(s_moshtary,0)+ISNULL(s_marjoee,0)+ISNULL(s_hadaf,0) END AS jam_emtiaz,
-           CASE WHEN mahaneh = 1 AND marjoee_pct > 2 THEN 1 ELSE 0 END AS hazf
-    FROM emtiaz
+    SELECT e.*,
+           CASE WHEN e.mahaneh = 1 AND e.marjoee_pct > b.hazf_marjoee_bala THEN 0 ELSE
+                ISNULL(e.s_shop,0)+ISNULL(e.s_vizit,0)+ISNULL(e.s_satr,0)
+               +ISNULL(e.s_moshtary,0)+ISNULL(e.s_marjoee,0)+ISNULL(e.s_hadaf,0) END AS jam_emtiaz,
+           CASE WHEN e.mahaneh = 1 AND e.marjoee_pct > b.hazf_marjoee_bala
+                THEN 1 ELSE 0 END                                                    AS hazf
+    FROM emtiaz e CROSS JOIN bazeh b
 )
-SELECT ROW_NUMBER() OVER (ORDER BY hazf, jam_emtiaz DESC)       AS "رتبه",
-       person        AS "فروشنده",
-       ccForoshandeh AS "کد مسیر",
-       n_people      AS "نفرات مسیر",
-       CAST(jam_emtiaz AS decimal(9,2)) AS "جمع امتیاز",
-       CASE WHEN hazf = 1 THEN N'حذف — مرجوعی بالای ۲٪'
-            WHEN jam_emtiaz > 0  THEN N'عالی'
-            WHEN jam_emtiaz >= -5 THEN N'معمولی'
+SELECT ROW_NUMBER() OVER (ORDER BY j.hazf, j.jam_emtiaz DESC)  AS "رتبه",
+       j.person        AS "فروشنده",
+       j.ccForoshandeh AS "کد مسیر",
+       j.n_people      AS "نفرات مسیر",
+       CAST(j.jam_emtiaz AS decimal(9,2)) AS "جمع امتیاز",
+       CASE WHEN j.hazf = 1 THEN N'حذف — مرجوعی بالای ' + CAST(CAST(b.hazf_marjoee_bala AS decimal(4,2)) AS nvarchar(10)) + N'٪'
+            WHEN j.jam_emtiaz > b.band_ali       THEN N'عالی'
+            WHEN j.jam_emtiaz >= b.band_maamouli THEN N'معمولی'
             ELSE N'نیازمند تصمیم اساسی' END AS "وضعیت",
-       CAST(s_shop AS decimal(9,2))     AS "امتیاز تعداد مغازه",
-       CAST(s_vizit AS decimal(9,2))    AS "امتیاز ویزیت مثبت",
-       CAST(s_satr AS decimal(9,2))     AS "امتیاز سطر فاکتور",
-       CAST(s_moshtary AS decimal(9,2)) AS "امتیاز مشتری خرید کرده",
-       CAST(s_marjoee AS decimal(9,2))  AS "امتیاز مرجوعی",
-       CAST(s_hadaf AS decimal(9,2))    AS "امتیاز هدف گروه",
-       tedad_ba_zarib AS "تعداد مغازه با ضریب",
-       kol_faktor     AS "تعداد فاکتور",
-       rooz_kari      AS "روز کاری",
-       CAST(vizit_pct AS decimal(6,2))       AS "درصد ویزیت مثبت",
-       CAST(satr_per_faktor AS decimal(6,2)) AS "میانگین سطر فاکتور",
-       CAST(moshtary_pct AS decimal(6,2))    AS "درصد مشتری خرید کرده",
-       tedad_marjoee  AS "تعداد مرجوعی فروش",
-       tedad_forosh   AS "تعداد فروش",
-       CAST(marjoee_pct AS decimal(6,3))     AS "درصد مرجوعی مبنادار",
-       CAST(tahaghogh_pct AS decimal(8,2))   AS "تحقق هدف گروه",
-       n_goroh AS "تعداد گروه",
-       CAST(d_from AS date) AS "از", CAST(DATEADD(day,-1,d_to) AS date) AS "تا",
+       CAST(j.s_shop AS decimal(9,2))     AS "امتیاز واحد مغازه‌روز",
+       CAST(j.s_vizit AS decimal(9,2))    AS "امتیاز ویزیت مثبت",
+       CAST(j.s_satr AS decimal(9,2))     AS "امتیاز سطر فاکتور",
+       CAST(j.s_moshtary AS decimal(9,2)) AS "امتیاز مشتری خرید کرده",
+       CAST(j.s_marjoee AS decimal(9,2))  AS "امتیاز مرجوعی",
+       CAST(j.s_hadaf AS decimal(9,2))    AS "امتیاز هدف گروه",
+       CAST(j.vahed_ba_zarib AS decimal(12,2)) AS "واحد مغازه‌روز با ضریب",
+       j.mr_kol         AS "مغازه‌روز (بدون ضریب)",
+       j.mr_khord       AS "مغازه‌روز خرده",
+       j.mr_omde        AS "مغازه‌روز عمده",
+       j.mr_zanjireh    AS "مغازه‌روز زنجیره‌ای",
+       j.mr_digar       AS "مغازه‌روز سایر انواع",
+       j.mr_bi_zarib    AS "مغازه‌روز بدون ضریب",
+       j.magazeh_yekta  AS "مغازه یکتا",
+       j.khord_yekta    AS "مغازه خرده",
+       j.omde_yekta     AS "مغازه عمده",
+       j.zanjireh_yekta AS "مغازه زنجیره‌ای",
+       j.vizit_rafteh   AS "ویزیت رفته",
+       j.vizit_mosbat   AS "ویزیت مثبت",
+       CAST(j.vizit_pct AS decimal(6,2)) AS "درصد ویزیت مثبت",
+       j.moshtary_rafteh  AS "مغازه ویزیت‌شده",
+       j.vizit_khord      AS "مغازه ویزیت‌شده خرده",
+       j.vizit_omde       AS "مغازه ویزیت‌شده عمده",
+       j.vizit_zanjireh   AS "مغازه ویزیت‌شده زنجیره‌ای",
+       j.moshtary_kharid  AS "مشتری خرید کرده",
+       CAST(j.moshtary_pct AS decimal(6,2))    AS "درصد مشتری خرید کرده",
+       j.kol_faktor  AS "تعداد فاکتور",
+       CAST(j.satr_per_faktor AS decimal(6,2)) AS "میانگین سطر فاکتور",
+       j.tedad_marjoee AS "تعداد مرجوعی فروش",
+       j.tedad_forosh  AS "تعداد فروش",
+       CAST(j.marjoee_pct AS decimal(6,3))     AS "درصد مرجوعی مبنادار",
+       CAST(j.tahaghogh_pct AS decimal(8,2))   AS "تحقق هدف گروه",
+       j.n_goroh   AS "تعداد گروه",
+       j.rooz_kari AS "روز کاری",
+       CAST(j.d_from AS date) AS "از", CAST(DATEADD(day,-1,j.d_to) AS date) AS "تا",
        ISNULL(sz.NameSazmanForosh, N'همه لاین‌ها') AS "لاین فروش"
-FROM jam
-LEFT JOIN Global.SazmanForosh sz ON sz.ccSazmanForosh = jam.sazman_forosh
-ORDER BY hazf, jam_emtiaz DESC
+FROM jam j
+CROSS JOIN bazeh b
+LEFT JOIN Global.SazmanForosh sz ON sz.ccSazmanForosh = j.sazman_forosh
+ORDER BY j.hazf, j.jam_emtiaz DESC
 ```
 
 ## ۲. تغییر آستانه‌ها
@@ -228,7 +299,7 @@ ORDER BY hazf, jam_emtiaz DESC
 شدند، در کوئری این جاها را دست ببر — همه در CTE `emtiaz` کنار هم‌اند:
 
 ```sql
-(tedad_ba_zarib - CASE WHEN mahaneh = 1 THEN 280 ELSE 25 END)
+(vahed_ba_zarib - CASE WHEN mahaneh = 1 THEN 280 ELSE 25 END)
   / CASE WHEN mahaneh = 1 THEN 5.0 ELSE 1.0 END       AS s_shop
 (vizit_pct - 40) * 0.5                                AS s_vizit
 (satr_per_faktor - 6) * 0.5                           AS s_satr
@@ -252,7 +323,7 @@ CASE WHEN mahaneh = 1 THEN (moshtary_pct - 80) * 0.5 END AS s_moshtary
 
 | ستون کوئری | کلید `score.py` |
 |---|---|
-| `tedad_ba_zarib` | `weighted_shops` |
+| `vahed_ba_zarib` | `weighted_shops` |
 | `vizit_rafteh` | `visits_total` |
 | `vizit_mosbat` | `visits_positive` |
 | `tedad_satr` | `invoice_line_count` |
