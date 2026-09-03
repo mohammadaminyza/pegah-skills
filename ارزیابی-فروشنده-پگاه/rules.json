@@ -1,5 +1,5 @@
 {
-  "version": "1405-06-12",
+  "version": "1405-06-12-2",
   "stepping": "continuous",
   "bands": [
     {
@@ -30,13 +30,13 @@
   ],
   "shop_types": [
     {"code": 347, "key": "khord", "label": "خرده", "weight": 1},
-    {"code": 348, "key": "omde", "label": "عمده", "weight": 2},
+    {"code": 348, "key": "omde", "label": "عمده", "weight": 3},
     {"code": 349, "key": "taavoni_vizheh", "label": "تعاونی ویژه", "weight": 1.5},
     {"code": 350, "key": "zanjireh", "label": "زنجیره‌ای", "weight": 4},
     {"code": 352, "key": "namayandeh_2", "label": "نماینده ۲", "weight": 10},
     {"code": 351, "key": "namayandeh", "label": "نماینده", "weight": 20}
   ],
-  "shop_types_source": "Sales.ZaribNoeMoshtary — کدها از Global.Goroh با ccGorohLink = 304",
+  "shop_types_source": "Sales.ZaribNoeMoshtary — کدها از Global.Goroh با ccGorohLink = 304. عمده (۳۴۸) اینجا ۳ است ولی جدول ۲ دارد: تصمیم مدیر فروش، تا وقتی جدول اصلاح شود.",
   "seller_type_code": 1,
   "return_basis": "quantity",
   "min_invoices": 5,

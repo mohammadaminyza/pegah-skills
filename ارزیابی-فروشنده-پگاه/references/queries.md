@@ -64,6 +64,7 @@ WITH params AS (
         348                        AS cc_omde,
         350                        AS cc_zanjireh,
         CAST(0.0 AS float)         AS zarib_pishfarz,     -- نوعی که در جدول ضرایب نیست
+        CAST(3.0 AS float)         AS zarib_omde,         -- جدول ۲ دارد؛ ۳ تصمیم مدیر فروش است
         1                          AS masoleiat_marjoee,  -- ۱ فروش، ۲ پخش، ۳ تولید، ۴ هردو
         25.0  AS mabna_magazeh_rooz, 1.0  AS gam_magazeh_rooz,
         280.0 AS mabna_magazeh_mah,  5.0  AS gam_magazeh_mah,  1.0 AS nomre_magazeh,
@@ -86,10 +87,12 @@ bazeh AS (
     FROM params p
 ),
 zarib AS (
-    -- ضریب نوع مشتری از خودِ سیستم. برای ضریب دستی، این را با یک VALUES عوض کن:
-    -- SELECT * FROM (VALUES (347,1.0),(348,2.0),(349,1.5),(350,4.0)) v(ccNoeMoshtary, zarib)
-    SELECT z.ccNoeMoshtary, CAST(z.Zarib AS float) AS zarib
-    FROM Sales.ZaribNoeMoshtary z
+    -- ضریب نوع مشتری از خودِ سیستم، جز عمده: جدول ۲ دارد و مدیر فروش ۳ گفته.
+    -- وقتی ZaribNoeMoshtary اصلاح شد، CASE را بردار.
+    SELECT z.ccNoeMoshtary,
+           CASE WHEN z.ccNoeMoshtary = b.cc_omde THEN b.zarib_omde
+                ELSE CAST(z.Zarib AS float) END AS zarib
+    FROM Sales.ZaribNoeMoshtary z CROSS JOIN bazeh b
 ),
 taghvim AS (
     SELECT COUNT(*) AS rooz_kari
