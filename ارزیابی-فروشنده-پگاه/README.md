@@ -23,8 +23,8 @@ examples/sample-input.json    نمونه ورودی کامل
 | ۲ درصد ویزیت مثبت | `Sales.VisitForoshandeh_Arshiv` — رویدادِ ویزیت |
 | ۳ میانگین سطر هر فاکتور | `Sales.DarkhastFaktorSatr` — `COUNT(*)` |
 | ۴ درصد مشتری خرید کرده | `VisitForoshandeh_Arshiv` — مشتریِ متمایز (فقط ماهانه) |
-| ۵ درصد فاکتور مرجوعی | `AmarForosh_Arshive` — فاکتور مرجوعی‌دار ÷ کل فاکتور |
-| ۶ درصد تحقق کل هدف | `Sales.HadafForoshRoozanehNew` (فقط ماهانه) |
+| ۵ درصد مرجوعی مبنادار | `Sales.ElamMarjoee(Satr)` با `MasoleiatElat = 1` — کالا ÷ کالا |
+| ۶ درصد تحقق کل هدف | `Sales.HadafForoshRoozanehNew` (فقط ماهانه، سقف ۱۲۰٪ هر گروه) |
 | تقویم | `Global.Taghvim` (`CodeNoeTatili IS NULL`) |
 | گروه محصول | `Global.Goroh` با `ccGorohLink = 560` |
 | لاین فروش | `Global.SazmanForosh` |
@@ -73,7 +73,10 @@ python scripts/score.py - --period daily --json < metrics.json
 
 - نمره‌دهی **پیوسته** است: ویزیت مثبت ۴۳.۴٪ با مبنای ۴۰٪ و ۰.۵ نمره در هر ۱٪
   می‌شود ۱.۷ نمره. برای حالت پله‌ای، `"stepping": "stepped"` در `rules.json`.
-- معیار ۶ **میانگین** نمره گروه‌های محصول است، نه جمعشان.
+- معیار ۶ **نسبت جمعِ فروش به جمعِ هدف** است، نه میانگینِ درصدِ گروه‌ها — و هر
+  گروه سقف **۱۲۰٪** دارد که پیش از جمع زدن اعمال می‌شود (`cap_pct`).
+- باندهای وضعیت: ۲۰ به بالا عالی، ۱۵ تا ۲۰ خوب، ۱۰ تا ۱۵ متوسط، بالای ۱۰− تا ۱۰
+  ضعیف، ۱۰− و پایین‌تر رد.
 - مرجوعی بالای ۲٪ در ارزیابی «تا روز» نمره کل را صفر می‌کند و آن فروشنده ته
   جدول می‌نشیند. نمره خام در `--json` با کلید `raw_total` می‌ماند.
 

@@ -69,29 +69,36 @@ def points(criterion, value, stepping):
 
 
 def group_result(criterion, person, stepping):
-    """نمره معیار هدف: جمع فروش تقسیم بر جمع هدفِ همه گروه‌ها — نه میانگین نسبت‌ها.
+    """نمره معیار هدف: جمع فروشِ سقف‌خورده تقسیم بر جمع هدف — نه میانگین نسبت‌ها.
 
-    میانگینِ درصدِ تک‌تک گروه‌ها با یک گروهِ ریزِ پرتحقق تا چند صد درصد بالا
-    می‌رود؛ نسبت کل بین صفر و حدود ۱۲۰٪ می‌ماند.
+    هر گروه سقف cap_pct دارد؛ فروشِ بیشتر از آن به همان سقف بریده می‌شود.
     """
+    cap = criterion.get("cap_pct")
     detail = []
     for group in person.get("product_groups") or []:
+        sales = float(group.get("sales") or 0)
+        target = float(group.get("target") or 0)
         achieved = group.get("achievement_pct")
         if achieved is None:
-            achieved = ratio(group.get("sales"), group.get("target"))
+            achieved = ratio(sales, target)
         if achieved is None:
             continue
+        capped = min(sales, cap / 100.0 * target) if cap is not None else sales
         detail.append(
             {
                 "name": group.get("name") or "—",
-                "sales": float(group.get("sales") or 0),
-                "target": float(group.get("target") or 0),
+                "sales": sales,
+                "target": target,
                 "achievement_pct": round(achieved, 2),
+                "capped_sales": capped,
+                "capped_achievement_pct": round(
+                    achieved if cap is None else min(achieved, float(cap)), 2
+                ),
             }
         )
     if not detail:
         return None, None, []
-    total_sales = sum(item["sales"] for item in detail)
+    total_sales = sum(item["capped_sales"] for item in detail)
     total_target = sum(item["target"] for item in detail)
     if not total_target:
         return None, None, detail
@@ -154,12 +161,12 @@ def evaluate(person, period, rules):
 
 
 def band(total, rules):
-    """برچسب عملکرد: عالی / معمولی / نیازمند تصمیم اساسی."""
+    """برچسب عملکرد. باندها از بالا به پایین‌اند و اولین تطابق برنده است."""
     for entry in rules.get("bands") or []:
-        low, high = entry.get("min"), entry.get("max")
-        if low is not None and total >= low:
+        low = entry.get("min")
+        if low is None:
             return entry["label"]
-        if high is not None and total < high:
+        if total > low if entry.get("min_exclusive") else total >= low:
             return entry["label"]
     return ""
 
@@ -194,9 +201,9 @@ def render(report):
 
     for result in report["results"]:
         lines += ["", f"### {result['name']}", ""]
-        lines.append("| معیار | مقدار | مبنا | نمره |")
-        lines.append("|---|---:|---:|---:|")
-        for row in result["criteria"]:
+        lines.append("| ردیف | معیار | مقدار | مبنا | نمره |")
+        lines.append("|---:|---|---:|---:|---:|")
+        for radif, row in enumerate(result["criteria"], start=1):
             unit = f" {row['unit']}" if row["unit"] else ""
             mark = " *" if row["assumed"] else ""
             shown = (
@@ -205,20 +212,22 @@ def render(report):
                 else f"{number(row['value'])}{unit}"
             )
             lines.append(
-                f"| {row['label']}{mark} | {shown} | "
+                f"| {radif} | {row['label']}{mark} | {shown} | "
                 f"{number(row['baseline'])}{unit} | {number(row['score'])} |"
             )
-        lines.append(f"| **جمع** | | | **{number(result['total'])}** |")
+        lines.append(f"| | **جمع** | | | **{number(result['total'])}** |")
 
         for row in result["criteria"]:
             if not row["groups"]:
                 continue
             lines += ["", "گروه‌های محصول:", "",
-                      "| گروه | فروش | هدف | تحقق هدف |", "|---|---:|---:|---:|"]
-            for group in row["groups"]:
+                      "| ردیف | گروه | فروش | هدف | تحقق هدف | تحقق با سقف |",
+                      "|---:|---|---:|---:|---:|---:|"]
+            for radif, group in enumerate(row["groups"], start=1):
                 lines.append(
-                    f"| {group['name']} | {number(group['sales'])} | "
-                    f"{number(group['target'])} | {number(group['achievement_pct'])} ٪ |"
+                    f"| {radif} | {group['name']} | {number(group['sales'])} | "
+                    f"{number(group['target'])} | {number(group['achievement_pct'])} ٪ | "
+                    f"{number(group['capped_achievement_pct'])} ٪ |"
                 )
 
         if result["knockout"]:

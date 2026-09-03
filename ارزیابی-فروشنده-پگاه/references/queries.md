@@ -40,6 +40,10 @@ SELECT CAST('2026-08-22' AS date) AS rooz_arzyabi,   -- روز ارزیابی
   ۲۸۰ (ماهانه) عوض می‌شود.
 - معیار ۴ و معیار ۶ در دوره‌ی روزانه محاسبه **نمی‌شوند** (`NULL` می‌مانند) —
   دوره‌ی روزانه چهار معیار دارد.
+- معیار ۶ سقفِ `saghf_goroh` دارد و سقف **روی هر گروه جدا** می‌نشیند، نه روی
+  نسبت کل: فروشِ بیش از ۱۲۰٪ هدفِ یک گروه به ۱۲۰٪ همان گروه بریده می‌شود و بعد
+  جمع‌ها تقسیم می‌شوند. ستون «تحقق هدف گروه (بدون سقف)» عدد نبریده را کنارش
+  می‌گذارد تا معلوم باشد چقدر بریده شد.
 - `marjoee` مرجوعیِ **مبنادار** را می‌آورد: اقلامی که علتشان مسئولیتِ «فروش»
   دارد (`Warehouse.ElatMarjoeeKala.MasoleiatElat = 1`). خرابی، ضایعات تولید و
   آسیب انبار مسئولیتِ تولید و پخش‌اند و در این عدد نیستند. مخرجش `tedad_forosh`
@@ -68,8 +72,10 @@ WITH params AS (
         80.0  AS mabna_moshtary,     1.0  AS gam_moshtary,     0.5 AS nomre_moshtary,
         1.0   AS mabna_marjoee,      0.25 AS gam_marjoee,      1.0 AS nomre_marjoee,
         75.0  AS mabna_hadaf,        1.0  AS gam_hadaf,        1.0 AS nomre_hadaf,
+        120.0 AS saghf_goroh,        -- سقف تحقق هر گروه هدف
         2.0   AS hazf_marjoee_bala,
-        0.0   AS band_ali,           -5.0 AS band_maamouli
+        20.0  AS band_ali,           15.0 AS band_khob,
+        10.0  AS band_motevaset,     -10.0 AS band_rad
 ),
 bazeh AS (
     SELECT p.*,
@@ -162,9 +168,14 @@ vis AS (
     GROUP BY v.ccForoshandeh
 ),
 goroh AS (
-    SELECT ccForoshandeh,
-           100.0 * SUM(forosh) / NULLIF(SUM(hadaf), 0) AS tahaghogh_pct,
-           COUNT(*)                                    AS n_goroh
+    -- سقف هر گروه جدا اعمال می‌شود، بعد جمع می‌شوند؛ نه سقف روی نسبت کل.
+    SELECT gh.ccForoshandeh,
+           100.0 * SUM(CASE WHEN gh.forosh > gh.hadaf * b.saghf_goroh / 100.0
+                            THEN gh.hadaf * b.saghf_goroh / 100.0
+                            ELSE gh.forosh END)
+                 / NULLIF(SUM(gh.hadaf), 0)                AS tahaghogh_pct,
+           100.0 * SUM(gh.forosh) / NULLIF(SUM(gh.hadaf), 0) AS tahaghogh_bi_saghf,
+           COUNT(*)                                        AS n_goroh
     FROM (
         SELECT h.ccForoshandeh, h.ccGorohKala,
                SUM(h.TedadHadaf)  AS hadaf,
@@ -174,8 +185,8 @@ goroh AS (
           AND (b.sazman_forosh IS NULL OR h.ccSazmanForosh = b.sazman_forosh)
         GROUP BY h.ccForoshandeh, h.ccGorohKala
         HAVING SUM(h.TedadHadaf) > 0
-    ) gh
-    GROUP BY ccForoshandeh
+    ) gh CROSS JOIN bazeh b
+    GROUP BY gh.ccForoshandeh
 ),
 asli AS (
     SELECT ccForoshandeh, ccAfradForoshandeh,
@@ -204,7 +215,7 @@ calc AS (
            1.0   * s.tedad_satr      / NULLIF(fr.kol_faktor, 0)      AS satr_per_faktor,
            100.0 * v.moshtary_kharid / NULLIF(v.moshtary_rafteh, 0)  AS moshtary_pct,
            100.0 * ISNULL(mj.tedad_marjoee, 0) / NULLIF(fr.tedad_forosh, 0) AS marjoee_pct,
-           gr.tahaghogh_pct, gr.n_goroh
+           gr.tahaghogh_pct, gr.tahaghogh_bi_saghf, gr.n_goroh
     FROM Sales.Foroshandeh f
     CROSS JOIN bazeh b
     CROSS JOIN taghvim tv
@@ -248,9 +259,11 @@ SELECT ROW_NUMBER() OVER (ORDER BY j.hazf, j.jam_emtiaz DESC)  AS "رتبه",
        j.n_people      AS "نفرات مسیر",
        CAST(j.jam_emtiaz AS decimal(9,2)) AS "جمع امتیاز",
        CASE WHEN j.hazf = 1 THEN N'حذف — مرجوعی بالای ' + CAST(CAST(b.hazf_marjoee_bala AS decimal(4,2)) AS nvarchar(10)) + N'٪'
-            WHEN j.jam_emtiaz > b.band_ali       THEN N'عالی'
-            WHEN j.jam_emtiaz >= b.band_maamouli THEN N'معمولی'
-            ELSE N'نیازمند تصمیم اساسی' END AS "وضعیت",
+            WHEN j.jam_emtiaz >= b.band_ali       THEN N'عالی'
+            WHEN j.jam_emtiaz >= b.band_khob      THEN N'خوب'
+            WHEN j.jam_emtiaz >= b.band_motevaset THEN N'متوسط'
+            WHEN j.jam_emtiaz >  b.band_rad       THEN N'ضعیف'
+            ELSE N'رد — نیازمند تصمیم اساسی' END AS "وضعیت",
        CAST(j.s_shop AS decimal(9,2))     AS "امتیاز واحد مغازه‌روز",
        CAST(j.s_vizit AS decimal(9,2))    AS "امتیاز ویزیت مثبت",
        CAST(j.s_satr AS decimal(9,2))     AS "امتیاز سطر فاکتور",
@@ -282,7 +295,8 @@ SELECT ROW_NUMBER() OVER (ORDER BY j.hazf, j.jam_emtiaz DESC)  AS "رتبه",
        j.tedad_marjoee AS "تعداد مرجوعی فروش",
        j.tedad_forosh  AS "تعداد فروش",
        CAST(j.marjoee_pct AS decimal(6,3))     AS "درصد مرجوعی مبنادار",
-       CAST(j.tahaghogh_pct AS decimal(8,2))   AS "تحقق هدف گروه",
+       CAST(j.tahaghogh_pct AS decimal(8,2))       AS "تحقق هدف گروه (با سقف)",
+       CAST(j.tahaghogh_bi_saghf AS decimal(8,2))  AS "تحقق هدف گروه (بدون سقف)",
        j.n_goroh   AS "تعداد گروه",
        j.rooz_kari AS "روز کاری",
        CAST(j.d_from AS date) AS "از", CAST(DATEADD(day,-1,j.d_to) AS date) AS "تا",
@@ -310,10 +324,13 @@ CASE WHEN mahaneh = 1 THEN (moshtary_pct - 80) * 0.5 END AS s_moshtary
 و خودِ `marjoee_pct` در CTE `calc`:
 `100.0 * ISNULL(mj.tedad_marjoee, 0) / NULLIF(fk.tedad_forosh, 0)`.
 
-و معیار ۶ در CTE `goroh`: `100.0 * SUM(forosh) / SUM(hadaf) - 75`.
+و معیار ۶ در CTE `goroh`: جمعِ فروشِ سقف‌خورده تقسیم بر جمع هدف. سقف را با
+`saghf_goroh` عوض کن؛ `NULL` کردنش سقف را برنمی‌دارد — برای برداشتن سقف عدد
+بزرگی مثل `100000` بگذار یا `CASE` را بردار.
 
-باندهای وضعیت هم در `SELECT` نهایی‌اند: بالای صفر «عالی»، تا ۵− «معمولی»،
-زیر آن «نیازمند تصمیم اساسی».
+باندهای وضعیت هم در `SELECT` نهایی‌اند و از `band_ali`، `band_khob`،
+`band_motevaset` و `band_rad` می‌آیند: ۲۰ به بالا «عالی»، ۱۵ تا ۲۰ «خوب»،
+۱۰ تا ۱۵ «متوسط»، بالای ۱۰− تا ۱۰ «ضعیف»، و ۱۰− و پایین‌تر «رد».
 
 ## ۳. ورودی برای `score.py`
 
@@ -358,8 +375,8 @@ print(r.stdout or r.stderr)
 یک‌سی‌ویکمِ ماه را نمی‌فروشد. نتیجه: یک روز پرفروش ۱۳۰۰٪ هدفِ آن روز درمی‌آید و
 جمع امتیاز را نابود می‌کند.
 
-در دوره‌ی ماهانه همین نسبت بین صفر و ۱۲۰٪ می‌ماند، چون فراز و فرود روزها روی هم
-هموار می‌شود. معیار ۶ ذاتاً ماهانه است.
+در دوره‌ی ماهانه فراز و فرود روزها روی هم هموار می‌شود و سقف ۱۲۰٪ بالایش را
+می‌بندد. معیار ۶ ذاتاً ماهانه است.
 
 اگر مدیر فروش اصرار داشت در ارزیابی روزانه هم باشد، تنها شکل معقولش مقایسه‌ی
 **ماه تا امروز** است، نه فروشِ همان یک روز.
@@ -397,7 +414,8 @@ GROUP BY IsMarjoee
 
 - میانگین ویزیت مثبت ۴۰.۲٪ در برابر مبنای ۴۰٪
 - میانگین سطر هر فاکتور ۶.۸ در برابر مبنای ۶
-- میانگین تحقق هدف ۷۳.۴٪ در برابر مبنای ۷۵٪
+- میانگین تحقق هدف ۷۳.۴٪ در برابر مبنای ۷۵٪ — **پیش از سقف ۱۲۰٪** اندازه‌گیری
+  شده؛ با سقف فقط پایین‌تر می‌آید، نه بالاتر
 - میانگین مرجوعی مبنادار ۰.۴۴٪ در برابر مبنای ۱٪؛ بیشترین ۱.۷۸٪، و ۱۰۰ از ۱۰۸
   زیر ۱٪
 - میانگین جمع امتیاز ۱۶.۴−
