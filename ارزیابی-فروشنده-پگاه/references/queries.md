@@ -75,8 +75,8 @@ WITH params AS (
         75.0  AS mabna_hadaf,        1.0  AS gam_hadaf,        1.0 AS nomre_hadaf,
         120.0 AS saghf_goroh,        -- سقف تحقق هر گروه هدف
         2.0   AS hazf_marjoee_bala,
-        20.0  AS band_ali,           15.0 AS band_khob,
-        10.0  AS band_motevaset,     -10.0 AS band_rad
+        18.0  AS band_ali,           16.0 AS band_khob,
+        12.0  AS band_motevaset
 ),
 bazeh AS (
     SELECT p.*,
@@ -265,8 +265,7 @@ SELECT ROW_NUMBER() OVER (ORDER BY j.hazf, j.jam_emtiaz DESC)  AS "رتبه",
             WHEN j.jam_emtiaz >= b.band_ali       THEN N'عالی'
             WHEN j.jam_emtiaz >= b.band_khob      THEN N'خوب'
             WHEN j.jam_emtiaz >= b.band_motevaset THEN N'متوسط'
-            WHEN j.jam_emtiaz >  b.band_rad       THEN N'ضعیف'
-            ELSE N'رد — نیازمند تصمیم اساسی' END AS "وضعیت",
+            ELSE N'ضعیف' END AS "وضعیت",
        CAST(j.s_shop AS decimal(9,2))     AS "امتیاز واحد مغازه‌روز",
        CAST(j.s_vizit AS decimal(9,2))    AS "امتیاز ویزیت مثبت",
        CAST(j.s_satr AS decimal(9,2))     AS "امتیاز سطر فاکتور",
@@ -331,9 +330,9 @@ CASE WHEN mahaneh = 1 THEN (moshtary_pct - 80) * 0.5 END AS s_moshtary
 `saghf_goroh` عوض کن؛ `NULL` کردنش سقف را برنمی‌دارد — برای برداشتن سقف عدد
 بزرگی مثل `100000` بگذار یا `CASE` را بردار.
 
-باندهای وضعیت هم در `SELECT` نهایی‌اند و از `band_ali`، `band_khob`،
-`band_motevaset` و `band_rad` می‌آیند: ۲۰ به بالا «عالی»، ۱۵ تا ۲۰ «خوب»،
-۱۰ تا ۱۵ «متوسط»، بالای ۱۰− تا ۱۰ «ضعیف»، و ۱۰− و پایین‌تر «رد».
+باندهای وضعیت هم در `SELECT` نهایی‌اند و از `band_ali`، `band_khob` و
+`band_motevaset` می‌آیند: ۱۸ به بالا «عالی»، ۱۶ تا ۱۸ «خوب»، ۱۲ تا ۱۶
+«متوسط»، و کمتر از ۱۲ «ضعیف».
 
 ## ۳. ورودی برای `score.py`
 
